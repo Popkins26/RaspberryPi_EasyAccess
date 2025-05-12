@@ -686,19 +686,24 @@ def open_task_scheduler():
 
 def fetch_recordings():
     try:
-        # Get recordings from Firestore (only from recordings collection)
-        recordings_ref = db.collection('recordings')
-        recordings = recordings_ref.order_by('timestamp', direction=firestore.Query.DESCENDING).get()
+        # Get recordings from Firebase Storage (only from recordings folder)
+        recordings_ref = bucket.list_blobs(prefix='recordings/')
         
         recordings_list = []
-        for doc in recordings:
-            data = doc.to_dict()
-            recordings_list.append({
-                'id': doc.id,
-                'name': data.get('name', 'Unnamed Recording'),
-                'downloadUrl': data.get('url', ''),
-                'timestamp': data.get('timestamp', None)
-            })
+        for blob in recordings_ref:
+            # Skip if it's a directory or not in recordings folder
+            if not blob.name.endswith('/'):
+                # Get the public URL
+                blob.make_public()
+                recordings_list.append({
+                    'id': blob.name,
+                    'name': os.path.basename(blob.name),
+                    'url': blob.public_url,
+                    'timestamp': blob.time_created
+                })
+        
+        # Sort recordings by timestamp (newest first)
+        recordings_list.sort(key=lambda x: x['timestamp'], reverse=True)
         
         logging.debug(f"Fetched recordings: {len(recordings_list)}")
         return recordings_list
