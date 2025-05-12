@@ -268,18 +268,8 @@ def start_camera_server():
         return False
 
 def show_camera():
-    """Show the camera stream in a web browser"""
-    try:
-        # Always open the stream in the default web browser
-        import webbrowser
-        webbrowser.open('http://localhost:5000/stream')
-        messagebox.showinfo("Camera Stream", 
-                          f"Camera stream opened in browser!\n\n"
-                          f"Local URL: http://localhost:5000/stream\n"
-                          f"Network URL: http://<raspberry-pi-ip>:5000/stream")
-    except Exception as e:
-        logger.error(f"Error starting camera stream: {e}")
-        messagebox.showerror("Camera Error", f"Failed to start camera stream: {e}")
+    """Show the camera preview window"""
+    camera_preview.start_preview()
 
 def fetch_user_data():
     global user_name, user_profile_pic_url
@@ -331,28 +321,33 @@ def fetch_current_task():
         tasks = tasks_ref.order_by('timestamp', direction=firestore.Query.DESCENDING).get()
         
         task_found = False
+        current_time = datetime.now()
+        
         for task_doc in tasks:
             task_data = task_doc.to_dict()
-            # Check if task is not completed
+            # Check if task is not completed and is due
             if not task_data.get('isCompleted', False):
-                current_task = task_data.get('task', None)
-                task_sent_time = task_data.get('sentTime', None)
-                task_due_time = task_data.get('dueTime', None)
-                task_found = True
-                
-                if current_task:
-                    task_text = f"Task: {current_task}\nSent: {task_sent_time}"
-                    if task_due_time:
-                        task_text += f"\nDue: {task_due_time}"
-                    task_display.config(text=task_text)
-                else:
-                    task_display.config(text="No current task.")
-                
-                logging.debug(f"Fetched task: {current_task}, {task_sent_time}, {task_due_time}")
-                break
+                scheduled_time = datetime.fromtimestamp(task_data.get('scheduledTime', 0) / 1000)
+                # Only show task if it's time to execute (within 5 minutes of scheduled time)
+                if abs((current_time - scheduled_time).total_seconds()) <= 300:  # 5 minutes = 300 seconds
+                    current_task = task_data.get('task', None)
+                    task_sent_time = task_data.get('sentTime', None)
+                    task_due_time = task_data.get('dueTime', None)
+                    task_found = True
+                    
+                    if current_task:
+                        task_text = f"Task: {current_task}\nSent: {task_sent_time}"
+                        if task_due_time:
+                            task_text += f"\nDue: {task_due_time}"
+                        task_display.config(text=task_text)
+                    else:
+                        task_display.config(text="No current task.")
+                    
+                    logging.debug(f"Fetched task: {current_task}, {task_sent_time}, {task_due_time}")
+                    break
         
         if not task_found:
-            task_display.config(text="No current task.")
+            task_display.config(text="No tasks due at this time.")
             current_task = None
             task_sent_time = None
             task_due_time = None
@@ -1115,6 +1110,9 @@ def check_scheduled_tasks():
                         audio_thread.daemon = True
                         audio_thread.start()
             
+            # Update task display
+            fetch_current_task()
+            
             # Sleep for a short time before next check
             time.sleep(1)
             
@@ -1240,6 +1238,63 @@ def toggle_flask_server():
     else:
         # Start the server
         launch_flask_server()
+
+# Add new camera preview window class
+class CameraPreviewWindow:
+    def __init__(self):
+        self.window = None
+        self.camera = None
+        self.is_running = False
+        self.preview_label = None
+        
+    def start_preview(self):
+        if self.window is None:
+            self.window = tk.Toplevel(root)
+            self.window.title("Camera Preview")
+            self.window.geometry("640x480")
+            
+            # Add close button
+            close_btn = tk.Button(self.window, text="Close", command=self.stop_preview)
+            close_btn.pack(pady=5)
+            
+            # Add preview label
+            self.preview_label = tk.Label(self.window)
+            self.preview_label.pack(expand=True, fill='both')
+            
+            # Initialize camera
+            self.camera = cv2.VideoCapture(0)
+            self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+            self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+            
+            self.is_running = True
+            self.update_preview()
+            
+    def update_preview(self):
+        if self.is_running and self.camera is not None:
+            ret, frame = self.camera.read()
+            if ret:
+                # Convert frame to RGB
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                # Convert to PhotoImage
+                image = Image.fromarray(frame_rgb)
+                photo = ImageTk.PhotoImage(image=image)
+                # Update label
+                self.preview_label.config(image=photo)
+                self.preview_label.image = photo
+            # Schedule next update
+            self.window.after(10, self.update_preview)
+            
+    def stop_preview(self):
+        self.is_running = False
+        if self.camera is not None:
+            self.camera.release()
+            self.camera = None
+        if self.window is not None:
+            self.window.destroy()
+            self.window = None
+
+# Create camera preview instance
+camera_preview = CameraPreviewWindow()
 
 # Create the main window and UI elements
 root = tk.Tk()
