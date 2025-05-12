@@ -51,7 +51,7 @@ except Exception as e:
 # Firebase Initialization
 cred = credentials.Certificate("serviceAccountKey.json")
 firebase_admin.initialize_app(cred, {
-    'storageBucket': 'project-app-8f1c2.appspot.com'  # Make sure this matches your Firebase Console
+    'storageBucket': 'project-app-8f1c2.firebasestorage.app'  # Updated bucket name
 })
 bucket = storage.bucket()
 db = firestore.client()
@@ -517,8 +517,11 @@ def upload_to_firebase(local_path):
         # Create the blob with the correct path
         blob = bucket.blob(f"voice_notes/{filename}")
         
-        # Upload the file
-        blob.upload_from_filename(local_path)
+        # Upload the file with content type
+        blob.upload_from_filename(
+            local_path,
+            content_type='audio/mpeg'
+        )
         
         # Make the file publicly accessible
         blob.make_public()
