@@ -1,7 +1,3 @@
-siddhant@raspberrypi:~ $ vcgencmd measure_temp
-temp=40.9'C
-siddhant@raspberrypi:~ $ source venv/bin/activate
-(venv) siddhant@raspberrypi:~ $ python gui.py
 pygame 2.6.1 (SDL 2.28.4, Python 3.11.2)
 Hello from the pygame community. https://www.pygame.org/contribute.html
 DEBUG:urllib3.connectionpool:Starting new HTTPS connection (1): oauth2.googleapis.com:443
@@ -19,10 +15,10 @@ DEBUG:root:Fetched recordings: 1
 /home/siddhant/venv/lib/python3.11/site-packages/google/cloud/firestore_v1/base_collection.py:303: UserWarning: Detected filter using positional arguments. Prefer using the 'filter' keyword argument instead.
   return query.where(field_path, op_string, value)
 DEBUG:root:Fetched recordings: 1
-INFO:__main__:Found USB microphone: Webcam C110: USB Audio (hw:3,0) at index 2
+INFO:__main__:Found USB microphone: Webcam C110: USB Audio (hw:1,0) at index 1
 DEBUG:root:Recording started.
 DEBUG:root:Recording thread stopped.
-DEBUG:pydub.converter:subprocess.call(['/usr/bin/ffmpeg', '-y', '-f', 'wav', '-i', '/tmp/tmplvym6fls', '-f', 'mp3', '/tmp/tmpvfrr8pe3'])
+DEBUG:pydub.converter:subprocess.call(['/usr/bin/ffmpeg', '-y', '-f', 'wav', '-i', '/tmp/tmptjrmx7kh', '-f', 'mp3', '/tmp/tmp2f70zumo'])
 DEBUG:pydub.converter:subprocess output: b'ffmpeg version 5.1.6-0+deb12u1+rpt3 Copyright (c) 2000-2024 the FFmpeg developers'
 DEBUG:pydub.converter:subprocess output: b'  built with gcc 12 (Debian 12.2.0-14)'
 DEBUG:pydub.converter:subprocess output: b'  configuration: --prefix=/usr --extra-version=0+deb12u1+rpt3 --toolchain=hardened --incdir=/usr/include/aarch64-linux-gnu --enable-gpl --disable-stripping --disable-mmal --enable-gnutls --enable-ladspa --enable-libaom --enable-libass --enable-libbluray --enable-libbs2b --enable-libcaca --enable-libcdio --enable-libcodec2 --enable-libdav1d --enable-libflite --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libglslang --enable-libgme --enable-libgsm --enable-libjack --enable-libmp3lame --enable-libmysofa --enable-libopenjpeg --enable-libopenmpt --enable-libopus --enable-libpulse --enable-librabbitmq --enable-librist --enable-librubberband --enable-libshine --enable-libsnappy --enable-libsoxr --enable-libspeex --enable-libsrt --enable-libssh --enable-libsvtav1 --enable-libtheora --enable-libtwolame --enable-libvidstab --enable-libvorbis --enable-libvpx --enable-libwebp --enable-libx265 --enable-libxml2 --enable-libxvid --enable-libzimg --enable-libzmq --enable-libzvbi --enable-lv2 --enable-omx --enable-openal --enable-opencl --enable-opengl --enable-sand --enable-sdl2 --disable-sndio --enable-libjxl --enable-neon --enable-v4l2-request --enable-libudev --enable-epoxy --libdir=/usr/lib/aarch64-linux-gnu --arch=arm64 --enable-pocketsphinx --enable-librsvg --enable-libdc1394 --enable-libdrm --enable-vout-drm --enable-libiec61883 --enable-chromaprint --enable-frei0r --enable-libx264 --enable-libplacebo --enable-librav1e --enable-shared'
@@ -35,21 +31,22 @@ DEBUG:pydub.converter:subprocess output: b'  libswscale      6.  7.100 /  6.  7.
 DEBUG:pydub.converter:subprocess output: b'  libswresample   4.  7.100 /  4.  7.100'
 DEBUG:pydub.converter:subprocess output: b'  libpostproc    56.  6.100 / 56.  6.100'
 DEBUG:pydub.converter:subprocess output: b'Guessed Channel Layout for Input Stream #0.0 : mono'
-DEBUG:pydub.converter:subprocess output: b"Input #0, wav, from '/tmp/tmplvym6fls':"
-DEBUG:pydub.converter:subprocess output: b'  Duration: 00:00:04.61, bitrate: 256 kb/s'
+DEBUG:pydub.converter:subprocess output: b"Input #0, wav, from '/tmp/tmptjrmx7kh':"
+DEBUG:pydub.converter:subprocess output: b'  Duration: 00:00:03.71, bitrate: 256 kb/s'
 DEBUG:pydub.converter:subprocess output: b'  Stream #0:0: Audio: pcm_s16le ([1][0][0][0] / 0x0001), 16000 Hz, mono, s16, 256 kb/s'
 DEBUG:pydub.converter:subprocess output: b'Stream mapping:'
 DEBUG:pydub.converter:subprocess output: b'  Stream #0:0 -> #0:0 (pcm_s16le (native) -> mp3 (libmp3lame))'
 DEBUG:pydub.converter:subprocess output: b'Press [q] to stop, [?] for help'
-DEBUG:pydub.converter:subprocess output: b"Output #0, mp3, to '/tmp/tmpvfrr8pe3':"
+DEBUG:pydub.converter:subprocess output: b"Output #0, mp3, to '/tmp/tmp2f70zumo':"
 DEBUG:pydub.converter:subprocess output: b'  Metadata:'
 DEBUG:pydub.converter:subprocess output: b'    TSSE            : Lavf59.27.100'
 DEBUG:pydub.converter:subprocess output: b'  Stream #0:0: Audio: mp3, 16000 Hz, mono, s16p'
 DEBUG:pydub.converter:subprocess output: b'    Metadata:'
 DEBUG:pydub.converter:subprocess output: b'      encoder         : Lavc59.37.100 libmp3lame'
 DEBUG:pydub.converter:subprocess output: b'size=       0kB time=-00:00:00.03 bitrate=N/A speed=N/A'
-DEBUG:pydub.converter:subprocess output: b'size=      14kB time=00:00:04.64 bitrate=  24.7kbits/s speed=53.5x'
-DEBUG:pydub.converter:subprocess output: b'video:0kB audio:14kB subtitle:0kB other streams:0kB global headers:0kB muxing overhead: 1.590331%'
+DEBUG:pydub.converter:subprocess output: b'[libmp3lame @ 0x55929e3d50] Trying to remove 576 samples, but the queue is empty'
+DEBUG:pydub.converter:subprocess output: b'size=      11kB time=00:00:03.74 bitrate=  24.9kbits/s speed= 106x'
+DEBUG:pydub.converter:subprocess output: b'video:0kB audio:11kB subtitle:0kB other streams:0kB global headers:0kB muxing overhead: 1.965409%'
 DEBUG:urllib3.util.retry:Converted retries value: 3 -> Retry(total=3, connect=None, read=None, redirect=None, status=None)
 DEBUG:urllib3.connectionpool:Starting new HTTPS connection (1): storage.googleapis.com:443
 DEBUG:urllib3.connectionpool:https://storage.googleapis.com:443 "POST /upload/storage/v1/b/project-app-8f1c2.appspot.com/o?uploadType=multipart HTTP/1.1" 404 247
@@ -67,10 +64,8 @@ ERROR:__main__:Upload Error: 404 POST https://storage.googleapis.com/upload/stor
   }
 }
 : ('Request failed with status code', 404, 'Expected one of', <HTTPStatus.OK: 200>)
-^CTraceback (most recent call last):
-  File "/home/siddhant/gui.py", line 1430, in <module>
-    root.mainloop()
-  File "/usr/lib/python3.11/tkinter/__init__.py", line 1485, in mainloop
-    self.tk.mainloop(n)
-KeyboardInterrupt
+INFO:__main__:Keeping local file at voice_note_1747070634.mp3 due to upload failure
+(venv) siddhant@raspberrypi:~ $ 
+
+
 
