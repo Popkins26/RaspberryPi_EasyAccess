@@ -125,6 +125,12 @@ stop_task_check = threading.Event()
 flask_server_process = None
 flask_server_running = False
 
+# --- Smaller button style for 7-inch display ---
+def create_small_button(parent, text, command, bg_color, fg_color="white", width=12):
+    return tk.Button(parent, text=text, command=command, bg=bg_color, fg=fg_color,
+                     font=("DejaVu Sans", 14, "bold"), width=width, height=1, relief="raised", borderwidth=2,
+                     activebackground="#444", activeforeground=fg_color)
+
 # Camera server functions
 def init_camera():
     """Initialize the USB camera"""
@@ -1321,6 +1327,12 @@ clock_label = tk.Label(title_frame, font=("DejaVu Sans Mono", 24), bg=STANDARD_B
 clock_label.pack(side='right', padx=(0, 20), anchor='e')
 update_clock()
 
+# Flask server status label below the clock, right-aligned
+flask_status_frame = tk.Frame(root, bg=STANDARD_BG)
+flask_status_frame.pack(fill='x', padx=20, pady=(0, 5))
+flask_status_label = tk.Label(flask_status_frame, text="Flask Server: Stopped", bg=STANDARD_BG, fg="#2C3E50", font=("DejaVu Sans", 11))
+flask_status_label.pack(side='right', anchor='e')
+
 # --- MAIN CONTENT FRAME (TWO COLUMNS, FLIPPED) ---
 content_frame = tk.Frame(root, bg=STANDARD_BG)
 content_frame.pack(fill='both', expand=True, padx=20, pady=10)
@@ -1328,20 +1340,10 @@ content_frame.grid_rowconfigure(0, weight=1)
 content_frame.grid_columnconfigure(0, weight=1, minsize=250)  # Left: buttons
 content_frame.grid_columnconfigure(1, weight=3, minsize=500)  # Right: interactive sections
 
-# --- LEFT COLUMN: Flask controls, Emergency, Exit/Shutdown ---
+# --- LEFT COLUMN: Profile, Emergency, Flask, Exit, Shutdown ---
 left_col = tk.Frame(content_frame, bg=STANDARD_BG)
 left_col.grid(row=0, column=0, sticky='ns', padx=(0, 20), pady=0)
 left_col.grid_propagate(True)
-
-# Flask server controls (side by side)
-flask_btns_frame = tk.Frame(left_col, bg=STANDARD_BG)
-flask_btns_frame.pack(pady=(10, 2))
-flask_btn = create_small_button(flask_btns_frame, "Launch Flask Server", launch_flask_server, "#27AE60", width=14)
-flask_btn.pack(side='left', padx=2)
-flask_toggle_btn = create_small_button(flask_btns_frame, "Toggle Flask Server", lambda: toggle_flask_server(), "#F39C12", fg_color="#222", width=14)
-flask_toggle_btn.pack(side='left', padx=2)
-flask_status_label = tk.Label(left_col, text="Flask Server: Stopped", bg=STANDARD_BG, fg="#2C3E50", font=("DejaVu Sans", 12))
-flask_status_label.pack(pady=(2, 10))
 
 # Profile & Greeting
 profile_frame = tk.Frame(left_col, bg=STANDARD_BG)
@@ -1352,16 +1354,20 @@ greeting_label = tk.Label(left_col, text="", bg=STANDARD_BG, fg="#2C3E50", font=
 greeting_label.pack(pady=2)
 
 # Emergency button (centered)
-emergency_btn = create_small_button(left_col, "EMERGENCY", emergency_pressed, "#E74C3C", width=20)
-emergency_btn.pack(pady=15)
+emergency_btn = create_small_button(left_col, "EMERGENCY", emergency_pressed, "#E74C3C", width=18)
+emergency_btn.pack(pady=15, fill='x', expand=True)
 
-# Exit GUI and Shutdown (side by side at the bottom)
-bottom_btns_frame = tk.Frame(left_col, bg=STANDARD_BG)
-bottom_btns_frame.pack(side='bottom', pady=10)
-exit_btn = create_small_button(bottom_btns_frame, "Exit GUI", lambda: on_closing(), "#34495E", width=10)
-exit_btn.pack(side='left', padx=5)
-shutdown_btn = create_small_button(bottom_btns_frame, "Shutdown", shutdown_pi, "#555555", width=10)
-shutdown_btn.pack(side='left', padx=5)
+# Flask server controls (stacked)
+flask_btn = create_small_button(left_col, "Launch Flask Server", launch_flask_server, "#27AE60", width=18)
+flask_btn.pack(pady=(10, 2), fill='x', expand=True)
+flask_toggle_btn = create_small_button(left_col, "Toggle Flask Server", lambda: toggle_flask_server(), "#F39C12", fg_color="#222", width=18)
+flask_toggle_btn.pack(pady=2, fill='x', expand=True)
+
+# Exit GUI and Shutdown (stacked)
+exit_btn = create_small_button(left_col, "Exit GUI", lambda: on_closing(), "#34495E", width=18)
+exit_btn.pack(pady=5, fill='x', expand=True)
+shutdown_btn = create_small_button(left_col, "Shutdown", shutdown_pi, "#555555", width=18)
+shutdown_btn.pack(pady=5, fill='x', expand=True)
 
 # --- RIGHT COLUMN: Camera, Task, Recordings (NO SECTION TITLES) ---
 right_col = tk.Frame(content_frame, bg=STANDARD_BG)
