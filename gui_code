@@ -514,37 +514,51 @@ def upload_to_firebase(local_path):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"voice_note_{timestamp}.mp3"
         
-        # Create the blob with the correct path
-        blob = bucket.blob(f"voice_notes/{filename}")
+        logger.debug(f"Attempting to upload file: {local_path}")
+        logger.debug(f"Using bucket: {bucket.name}")
+        
+        # Create the blob with the correct path for voice notes (Flutter app)
+        voice_note_blob = bucket.blob(f"voice_notes/{filename}")
+        logger.debug(f"Created voice note blob at path: voice_notes/{filename}")
         
         # Upload the file with content type
-        blob.upload_from_filename(
+        logger.debug("Starting file upload...")
+        voice_note_blob.upload_from_filename(
             local_path,
             content_type='audio/mpeg'
         )
+        logger.debug("File upload completed")
         
         # Make the file publicly accessible
-        blob.make_public()
+        logger.debug("Making file public...")
+        voice_note_blob.make_public()
+        logger.debug("File is now public")
         
         # Get the public URL
-        public_url = blob.public_url
+        public_url = voice_note_blob.public_url
+        logger.debug(f"Public URL: {public_url}")
         
-        # Add metadata to Firestore
-        db.collection('recordings').add({
+        # Add metadata to Firestore for voice notes (Flutter app)
+        logger.debug("Adding metadata to Firestore for voice notes...")
+        db.collection('voice_notes').add({
             'name': filename,
             'url': public_url,
             'timestamp': firestore.SERVER_TIMESTAMP,
             'type': 'voice_note'
         })
+        logger.debug("Voice note metadata added to Firestore")
         
         # Clean up local file
         os.remove(local_path)
+        logger.debug("Local file cleaned up")
         
-        messagebox.showinfo("Success", f"Voice note uploaded successfully!\nURL: {public_url}")
+        messagebox.showinfo("Success", f"Voice note uploaded successfully!")
         logger.info(f"Successfully uploaded {filename} to Firebase Storage")
         
     except Exception as e:
         logger.error(f"Upload Error: {e}")
+        logger.error(f"Error type: {type(e)}")
+        logger.error(f"Error details: {str(e)}")
         messagebox.showerror("Upload Error", f"Failed to upload voice note: {str(e)}")
         # Keep the local file if upload fails
         logger.info(f"Keeping local file at {local_path} due to upload failure")
@@ -672,7 +686,7 @@ def open_task_scheduler():
 
 def fetch_recordings():
     try:
-        # Get recordings from Firestore instead of Storage
+        # Get recordings from Firestore (only from recordings collection)
         recordings_ref = db.collection('recordings')
         recordings = recordings_ref.order_by('timestamp', direction=firestore.Query.DESCENDING).get()
         
@@ -682,7 +696,8 @@ def fetch_recordings():
             recordings_list.append({
                 'id': doc.id,
                 'name': data.get('name', 'Unnamed Recording'),
-                'downloadUrl': data.get('downloadUrl', '')
+                'downloadUrl': data.get('url', ''),
+                'timestamp': data.get('timestamp', None)
             })
         
         logging.debug(f"Fetched recordings: {len(recordings_list)}")
@@ -923,7 +938,17 @@ def update_media_player():
     if recordings:
         media_listbox.delete(0, tk.END)
         for recording in recordings:
-            media_listbox.insert(tk.END, recording['name'])
+            # Format the timestamp for display
+            timestamp = recording.get('timestamp')
+            if timestamp:
+                if isinstance(timestamp, datetime):
+                    formatted_time = timestamp.strftime('%Y-%m-%d %H:%M')
+                else:
+                    formatted_time = str(timestamp)
+                display_text = f"{recording['name']} ({formatted_time})"
+            else:
+                display_text = recording['name']
+            media_listbox.insert(tk.END, display_text)
     else:
         media_listbox.insert(tk.END, "No recordings available.")
 
