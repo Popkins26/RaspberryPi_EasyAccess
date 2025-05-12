@@ -1308,26 +1308,23 @@ root.title("Care Taker Bot")
 root.geometry("800x480")
 root.configure(bg=STANDARD_BG)
 
-# Title Frame
-title_frame = tk.Frame(root, bg=STANDARD_BG)
-title_frame.pack(fill='x', pady=10)
+# Configure grid weights for proper scaling
+root.grid_rowconfigure(0, weight=1)
+root.grid_columnconfigure(0, weight=1)
 
-# Title
-title_label = tk.Label(title_frame, text="CARE TAKER BOT", font=TITLE_FONT, bg=STANDARD_BG, fg="#2C3E50")
-title_label.pack(side='left', padx=20)
+# Make the window resizable
+root.resizable(True, True)
 
-# Clock
-clock_label = tk.Label(title_frame, font=("DejaVu Sans Mono", 24), bg=STANDARD_BG, fg="#2C3E50")
-clock_label.pack(side='right', padx=20)
-update_clock()  # Start clock updates
-
-# Main content frame
+# Configure the main frame to expand with the window
 main_frame = tk.Frame(root, bg=STANDARD_BG)
 main_frame.pack(fill='both', expand=True, padx=20, pady=10)
+main_frame.grid_rowconfigure(0, weight=1)
+main_frame.grid_columnconfigure(0, weight=1)
 
 # Left Frame with rounded corners
 left_frame = tk.Frame(main_frame, bg=STANDARD_BG, highlightbackground="#E0E6ED", highlightthickness=2)
-left_frame.place(x=20, y=20)
+left_frame.grid(row=0, column=0, sticky='nsew', padx=10, pady=10)
+left_frame.grid_rowconfigure(0, weight=1)
 
 # Profile Picture with border
 profile_frame = tk.Frame(left_frame, bg=STANDARD_BG, highlightbackground="#4A90E2", highlightthickness=2)
@@ -1340,7 +1337,7 @@ greeting_label = tk.Label(left_frame, text="", bg=STANDARD_BG, fg="#2C3E50",
                          wraplength=150, justify="center", font=STANDARD_FONT)
 greeting_label.pack(pady=10)
 
-# Update button styles for better touch targets
+# Update button styles for better visibility
 def create_emergency_button(parent, text, command, bg_color="#E74C3C"):
     return tk.Button(parent,
                     text=text,
@@ -1350,10 +1347,12 @@ def create_emergency_button(parent, text, command, bg_color="#E74C3C"):
                     font=BUTTON_FONT,
                     width=15,
                     height=1,
-                    relief=STANDARD_RELIEF,
-                    borderwidth=0,
+                    relief="raised",
+                    borderwidth=2,
                     padx=10,
-                    pady=5)
+                    pady=5,
+                    activebackground="#C0392B",
+                    activeforeground="white")
 
 def create_action_button(parent, text, command, bg_color=BUTTON_BG):
     return tk.Button(parent,
@@ -1364,16 +1363,41 @@ def create_action_button(parent, text, command, bg_color=BUTTON_BG):
                     font=BUTTON_FONT,
                     width=2,
                     height=1,
-                    relief=STANDARD_RELIEF,
-                    borderwidth=0,
+                    relief="raised",
+                    borderwidth=2,
                     padx=10,
-                    pady=5)
+                    pady=5,
+                    activebackground="#2980B9",
+                    activeforeground="white")
+
+def create_round_button(parent, text, command, bg_color=BUTTON_BG):
+    return tk.Button(parent,
+                    text=text,
+                    command=command,
+                    bg=bg_color,
+                    fg="white",
+                    font=BUTTON_FONT,
+                    width=3,
+                    height=1,
+                    relief="raised",
+                    borderwidth=2,
+                    padx=10,
+                    pady=5,
+                    activebackground="#2980B9",
+                    activeforeground="white")
 
 # Update the emergency and shutdown buttons with new styling
 emergency_btn = create_emergency_button(left_frame,
                                      f"{EMERGENCY_ICON} Emergency",
                                      emergency_pressed)
 emergency_btn.pack(pady=5)
+
+# Add Exit GUI button
+exit_btn = create_emergency_button(left_frame,
+                                 "🚪 Exit GUI",
+                                 lambda: on_closing(),
+                                 bg_color="#34495E")
+exit_btn.pack(pady=5)
 
 shutdown_btn = create_emergency_button(left_frame,
                                       f"{SHUTDOWN_ICON} Shutdown",
@@ -1403,8 +1427,11 @@ flask_status_label.pack(pady=5)
 
 # Camera Frame with modern styling
 camera_frame = tk.Frame(main_frame, bg=STANDARD_BG, highlightbackground="#E0E6ED", highlightthickness=2)
-camera_frame.place(x=230, y=20)
+camera_frame.grid(row=0, column=1, sticky='nsew', padx=10, pady=10)
+camera_frame.grid_rowconfigure(0, weight=1)
+camera_frame.grid_columnconfigure(0, weight=1)
 
+# Update the camera button
 camera_btn = tk.Button(camera_frame,
                       text=f"{CAMERA_ICON} Open Camera View",
                       command=show_camera,
@@ -1413,10 +1440,15 @@ camera_btn = tk.Button(camera_frame,
                       fg=BUTTON_FG,
                       width=BOX_WIDTH,
                       height=BOX_HEIGHT,
-                      relief=STANDARD_RELIEF,
-                      borderwidth=0)
+                      relief="raised",
+                      borderwidth=2,
+                      padx=10,
+                      pady=5,
+                      activebackground="#2980B9",
+                      activeforeground="white")
 camera_btn.grid(row=0, column=0, padx=STANDARD_PADDING, pady=STANDARD_PADDING)
 
+# Update the record voice button
 record_voice_btn = tk.Button(camera_frame,
                            text=MIC_ICON,
                            command=toggle_record_voice,
@@ -1425,72 +1457,107 @@ record_voice_btn = tk.Button(camera_frame,
                            font=BUTTON_FONT,
                            width=2,
                            height=1,
-                           relief=STANDARD_RELIEF,
-                           borderwidth=0)
+                           relief="raised",
+                           borderwidth=2,
+                           padx=10,
+                           pady=5,
+                           activebackground="#2980B9",
+                           activeforeground="white")
 record_voice_btn.grid(row=0, column=1, padx=STANDARD_PADDING, pady=STANDARD_PADDING)
 
 # Task Frame with modern styling
 task_frame = tk.Frame(main_frame, bg=STANDARD_BG, highlightbackground="#E0E6ED", highlightthickness=2)
-task_frame.place(x=230, y=150)
+task_frame.grid(row=1, column=1, sticky='nsew', padx=10, pady=10)
+task_frame.grid_rowconfigure(0, weight=1)
+task_frame.grid_columnconfigure(0, weight=1)
 
-task_display = tk.Label(task_frame, text="Loading task...", font=STANDARD_FONT, bg=STANDARD_BG, 
-                       fg="#2C3E50", wraplength=500, justify="center", relief="solid", 
-                       width=BOX_WIDTH, height=BOX_HEIGHT)
+# Update the task display
+task_display = tk.Label(task_frame,
+                       text="Loading task...",
+                       font=STANDARD_FONT,
+                       bg="white",
+                       fg="#2C3E50",
+                       wraplength=500,
+                       justify="center",
+                       relief="sunken",
+                       borderwidth=2,
+                       width=BOX_WIDTH,
+                       height=BOX_HEIGHT)
 task_display.grid(row=0, column=0, padx=STANDARD_PADDING, pady=STANDARD_PADDING)
 
 # Task control buttons with modern styling
 task_done_btn = tk.Button(task_frame,
                          text=DONE_ICON,
                          command=task_done,
-                         bg=BUTTON_BG,
-                         fg=BUTTON_FG,
+                         bg="#27AE60",
+                         fg="white",
                          font=BUTTON_FONT,
                          width=2,
                          height=1,
-                         relief=STANDARD_RELIEF,
-                         borderwidth=0)
+                         relief="raised",
+                         borderwidth=2,
+                         padx=10,
+                         pady=5,
+                         activebackground="#219A52",
+                         activeforeground="white")
 task_done_btn.grid(row=0, column=1, padx=STANDARD_PADDING, pady=STANDARD_PADDING)
 
 snooze_btn = tk.Button(task_frame,
                       text=SNOOZE_ICON,
                       command=snooze_task,
-                      bg=BUTTON_BG,
-                      fg=BUTTON_FG,
+                      bg="#F39C12",
+                      fg="white",
                       font=BUTTON_FONT,
                       width=2,
                       height=1,
-                      relief=STANDARD_RELIEF,
-                      borderwidth=0)
+                      relief="raised",
+                      borderwidth=2,
+                      padx=10,
+                      pady=5,
+                      activebackground="#D68910",
+                      activeforeground="white")
 snooze_btn.grid(row=0, column=2, padx=STANDARD_PADDING, pady=STANDARD_PADDING)
 
 # Media Frame with modern styling
 media_frame = tk.Frame(main_frame, bg=STANDARD_BG, highlightbackground="#E0E6ED", highlightthickness=2)
-media_frame.place(x=230, y=280)
+media_frame.grid(row=2, column=1, sticky='nsew', padx=10, pady=10)
+media_frame.grid_rowconfigure(0, weight=1)
+media_frame.grid_columnconfigure(0, weight=1)
 
-media_listbox = tk.Listbox(media_frame, font=STANDARD_FONT, width=BOX_WIDTH, height=BOX_HEIGHT, 
-                          bg="white", fg="#2C3E50", selectbackground=BUTTON_BG,
-                          selectforeground="white", relief="flat", borderwidth=0)
+# Update the media listbox
+media_listbox = tk.Listbox(media_frame,
+                          font=STANDARD_FONT,
+                          width=BOX_WIDTH,
+                          height=BOX_HEIGHT,
+                          bg="white",
+                          fg="#2C3E50",
+                          selectbackground=BUTTON_BG,
+                          selectforeground="white",
+                          relief="sunken",
+                          borderwidth=2)
 media_listbox.grid(row=0, column=0, padx=STANDARD_PADDING, pady=STANDARD_PADDING)
 
 # Media control buttons with modern styling
-def create_round_button(parent, text, command, bg_color=BUTTON_BG):
-    button = tk.Button(parent, text=text, command=command, bg=bg_color, fg="white", 
-                      font=BUTTON_FONT, width=3, height=1, relief="flat", borderwidth=0)
-    return button
-
-play_btn = create_round_button(media_frame, PLAY_ICON,
+play_btn = create_round_button(media_frame,
+                             PLAY_ICON,
                              command=lambda: play_recording(get_selected_recording()))
 play_btn.grid(row=0, column=1, padx=STANDARD_PADDING, pady=STANDARD_PADDING)
 
-pause_btn = create_round_button(media_frame, PAUSE_ICON, command=pause_recording)
+pause_btn = create_round_button(media_frame,
+                              PAUSE_ICON,
+                              command=pause_recording)
 pause_btn.config(state="disabled")
 pause_btn.grid(row=1, column=1, padx=STANDARD_PADDING, pady=STANDARD_PADDING)
 
-resume_btn = create_round_button(media_frame, RESUME_ICON, command=resume_recording)
+resume_btn = create_round_button(media_frame,
+                               RESUME_ICON,
+                               command=resume_recording)
 resume_btn.config(state="disabled")
 resume_btn.grid(row=0, column=2, padx=STANDARD_PADDING, pady=STANDARD_PADDING)
 
-stop_btn = create_round_button(media_frame, STOP_ICON, command=stop_playback)
+stop_btn = create_round_button(media_frame,
+                             STOP_ICON,
+                             command=stop_playback)
 stop_btn.config(state="disabled")
 stop_btn.grid(row=1, column=2, padx=STANDARD_PADDING, pady=STANDARD_PADDING)
 
