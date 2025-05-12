@@ -735,11 +735,11 @@ def convert_mp3_to_wav(mp3_path):
 def play_recording(recording):
     global is_playing, playback_thread, audio_data, sample_rate, playback_position, playback_duration, playback_stop_event
     try:
-        if not recording or 'downloadUrl' not in recording:
+        if not recording or 'url' not in recording:
             messagebox.showerror("Playback Error", "Invalid recording data")
             return
             
-        download_url = recording['downloadUrl']
+        download_url = recording['url']
         if not download_url:
             messagebox.showerror("Playback Error", "No download URL available")
             return
