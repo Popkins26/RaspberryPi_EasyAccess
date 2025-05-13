@@ -26,6 +26,7 @@ import wave
 import tkcalendar
 from tkcalendar import DateEntry
 import pygame  # For audio playback
+from flask import Flask, jsonify, Response  # Add Flask imports
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -452,29 +453,37 @@ def start_recording():
         logging.debug("Recording started.")
 
         def record_video():
-            # Set up video writer
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"video_{timestamp}.mp4"
-            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-            out = cv2.VideoWriter(filename, fourcc, 30.0, (640, 480))
+            """Record video for 10 seconds"""
+            global camera, is_streaming
             
-            is_streaming = True
-            start_time = time.time()
-            
-            while is_streaming and (time.time() - start_time) < 10:
-                ret, frame = camera.read()
-                if ret:
-                    out.write(frame)
-                    time.sleep(0.033)  # ~30 fps
-            
-            out.release()
-            
-            # Upload to Firebase
-            upload_video_to_firebase(filename)
-            
-            # Clean up
-            if os.path.exists(filename):
-                os.remove(filename)
+            try:
+                # Set up video writer
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                filename = f"video_{timestamp}.mp4"
+                fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                out = cv2.VideoWriter(filename, fourcc, 30.0, (640, 480))
+                
+                is_streaming = True
+                start_time = time.time()
+                
+                while is_streaming and (time.time() - start_time) < 10:
+                    ret, frame = camera.read()
+                    if ret:
+                        out.write(frame)
+                        time.sleep(0.033)  # ~30 fps
+                
+                out.release()
+                
+                # Upload to Firebase
+                upload_video_to_firebase(filename)
+                
+                # Clean up
+                if os.path.exists(filename):
+                    os.remove(filename)
+                
+            except Exception as e:
+                logger.error(f"Error recording video: {e}")
+                is_streaming = False
 
         recording_thread = threading.Thread(target=record_video, daemon=True)
         recording_thread.start()
@@ -1202,6 +1211,139 @@ def update_clock():
     current_time = datetime.now().strftime("%H:%M")
     clock_label.config(text=current_time)
     root.after(1000, update_clock)  # Still update every second for accuracy
+
+def toggle_record_voice():
+    """Toggle voice recording on/off"""
+    global is_recording, recording_thread
+    
+    if not is_recording:
+        try:
+            # Find USB microphone
+            mic_index = find_usb_microphone()
+            if mic_index is None:
+                messagebox.showerror("Recording Error", "No microphone found")
+                return
+
+            # Show recording notification
+            notification_window = tk.Toplevel(root)
+            notification_window.title("Recording Notification")
+            notification_window.geometry("400x200")
+            notification_window.attributes('-topmost', True)
+            
+            # Center the notification
+            notification_window.update_idletasks()
+            width = notification_window.winfo_width()
+            height = notification_window.winfo_height()
+            x = (notification_window.winfo_screenwidth() // 2) - (width // 2)
+            y = (notification_window.winfo_screenheight() // 2) - (height // 2)
+            notification_window.geometry(f'{width}x{height}+{x}+{y}')
+            
+            # Add warning message
+            warning_label = tk.Label(notification_window, 
+                                   text="⚠️ Recording in Progress ⚠️\n\nYou are being recorded.\nThis recording will be saved and uploaded.",
+                                   font=("DejaVu Sans", 14, "bold"),
+                                   fg="red",
+                                   justify="center")
+            warning_label.pack(pady=20)
+            
+            # Add countdown label
+            countdown_label = tk.Label(notification_window, 
+                                     text="Recording will stop in: 10",
+                                     font=("DejaVu Sans", 12))
+            countdown_label.pack(pady=10)
+
+            is_recording = True
+            record_voice_btn.config(bg="red", text="⏹️")
+            logging.debug("Voice recording started.")
+
+            def record_audio():
+                # Set up audio recording
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                filename = f"audio_{timestamp}.wav"
+                
+                # Record audio for 10 seconds
+                duration = 10  # seconds
+                sample_rate = 44100
+                
+                # Record audio
+                recording = sd.rec(int(duration * sample_rate),
+                                 samplerate=sample_rate,
+                                 channels=1,
+                                 dtype='float32')
+                
+                # Update countdown
+                for i in range(10, 0, -1):
+                    if not is_recording:
+                        break
+                    countdown_label.config(text=f"Recording will stop in: {i}")
+                    notification_window.update()
+                    time.sleep(1)
+                
+                # Stop recording
+                sd.stop()
+                
+                # Save the recording
+                sf.write(filename, recording, sample_rate)
+                
+                # Upload to Firebase
+                upload_audio_to_firebase(filename)
+                
+                # Clean up
+                if os.path.exists(filename):
+                    os.remove(filename)
+                
+                # Close notification window
+                notification_window.destroy()
+
+            recording_thread = threading.Thread(target=record_audio, daemon=True)
+            recording_thread.start()
+
+        except Exception as e:
+            logging.error(f"Error starting voice recording: {e}")
+            messagebox.showerror("Recording Error", f"Failed to start recording: {e}")
+            is_recording = False
+            record_voice_btn.config(bg=BUTTON_BG, text=MIC_ICON)
+    else:
+        stop_recording()
+
+def upload_audio_to_firebase(local_path):
+    """Upload audio file to Firebase Storage"""
+    try:
+        # Create a unique filename with timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"audio_{timestamp}.wav"
+        
+        logger.debug(f"Attempting to upload audio: {local_path}")
+        
+        # Create the blob with the correct path for audio files
+        audio_blob = bucket.blob(f"recordings/{filename}")
+        
+        # Upload the file with content type
+        audio_blob.upload_from_filename(
+            local_path,
+            content_type='audio/wav'
+        )
+        
+        # Make the file publicly accessible
+        audio_blob.make_public()
+        
+        # Get the public URL
+        public_url = audio_blob.public_url
+        
+        # Add metadata to Firestore
+        db.collection('recordings').add({
+            'name': filename,
+            'url': public_url,
+            'timestamp': firestore.SERVER_TIMESTAMP,
+            'type': 'audio'
+        })
+        
+        messagebox.showinfo("Success", f"Audio uploaded successfully!")
+        logger.info(f"Successfully uploaded {filename} to Firebase Storage")
+        
+    except Exception as e:
+        logger.error(f"Upload Error: {e}")
+        messagebox.showerror("Upload Error", f"Failed to upload audio: {str(e)}")
 
 # Create the main window and UI elements
 root = tk.Tk()
