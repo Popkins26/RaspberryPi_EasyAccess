@@ -1330,10 +1330,7 @@ def firestore_listener_thread():
             data = doc.to_dict()
             if data.get('record', False) and not last_state:
                 print("Remote recording requested!")
-                # Start the recording process (call your local recording function)
-                # You can call your start_recording() function here, or
-                # if you want to use camera_server.py, use subprocess:
-                subprocess.run(['python3', 'camera_server.py'])
+                start_recording()  # <-- This triggers your camera and upload
                 # Reset Firestore trigger
                 doc_ref.set({'record': False}, merge=True)
                 last_state = True
