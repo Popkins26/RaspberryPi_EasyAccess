@@ -470,6 +470,12 @@ def start_recording():
                 logger.error(f"Error recording video: {e}")
                 is_streaming = False
             finally:
+                # Close the camera preview window
+                if camera_preview.window is not None:
+                    camera_preview.stop_preview()
+                # Release camera resources
+                release_camera()
+                # Close notification window
                 notification_window.destroy()
 
         recording_thread = threading.Thread(target=record_video, daemon=True)
