@@ -1245,7 +1245,7 @@ def toggle_record_voice():
                 messagebox.showerror("Recording Error", "No microphone found")
                 return
             is_recording = True
-            record_voice_btn.config(bg="red", fg="white", text="Pause")
+            record_voice_btn.config(bg="red", fg="white", text="Stop Recording")
             logging.debug("Voice recording started.")
 
             # Start audio recording
@@ -1267,13 +1267,40 @@ def toggle_record_voice():
 
                 # Save the recording
                 timestamp = audio_start_time.strftime("%Y%m%d_%H%M%S")
-                filename = f"audio_{timestamp}.wav"
+                temp_wav = f"temp_{timestamp}.wav"
+                temp_mp3 = f"audio_{timestamp}.mp3"
+                
+                # First save as WAV
                 audio_data = np.concatenate(audio_recording, axis=0)
-                sf.write(filename, audio_data, sample_rate)
-                upload_audio_to_firebase(filename)
-                if os.path.exists(filename):
-                    os.remove(filename)
-                record_voice_btn.config(bg=BUTTON_BG, fg="white", text="Record Voice")
+                sf.write(temp_wav, audio_data, sample_rate)
+                
+                try:
+                    # Convert WAV to MP3 using ffmpeg
+                    subprocess.run([
+                        "/usr/bin/ffmpeg",
+                        '-i', temp_wav,
+                        '-codec:a', 'libmp3lame',
+                        '-qscale:a', '2',  # High quality MP3
+                        temp_mp3
+                    ], check=True, capture_output=True)
+                    
+                    # Upload MP3 to Firebase
+                    upload_audio_to_firebase(temp_mp3)
+                    
+                    # Clean up temporary files
+                    if os.path.exists(temp_wav):
+                        os.remove(temp_wav)
+                    if os.path.exists(temp_mp3):
+                        os.remove(temp_mp3)
+                        
+                except subprocess.CalledProcessError as e:
+                    logging.error(f"FFmpeg conversion error: {e.stderr.decode()}")
+                    messagebox.showerror("Conversion Error", "Failed to convert audio to MP3 format")
+                except Exception as e:
+                    logging.error(f"Error during audio processing: {e}")
+                    messagebox.showerror("Processing Error", f"Failed to process audio: {e}")
+                finally:
+                    record_voice_btn.config(bg=BUTTON_BG, fg="white", text="Record Voice")
 
             recording_thread = threading.Thread(target=record_audio_stream, daemon=True)
             recording_thread.start()
@@ -1293,7 +1320,7 @@ def upload_audio_to_firebase(local_path):
     try:
         # Create a unique filename with timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"audio_{timestamp}.wav"
+        filename = f"audio_{timestamp}.mp3"
         
         logger.debug(f"Attempting to upload audio: {local_path}")
         
@@ -1303,7 +1330,7 @@ def upload_audio_to_firebase(local_path):
         # Upload the file with content type
         audio_blob.upload_from_filename(
             local_path,
-            content_type='audio/wav'
+            content_type='audio/mp3'
         )
         
         # Make the file publicly accessible
