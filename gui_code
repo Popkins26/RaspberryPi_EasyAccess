@@ -26,7 +26,6 @@ import wave
 import tkcalendar
 from tkcalendar import DateEntry
 import pygame  # For audio playback
-from flask import Flask, jsonify, Response  # Add Flask imports
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -82,7 +81,6 @@ recording_thread = None
 recording_buffer = []
 
 # Camera server variables
-camera_server = None
 camera = None
 camera_thread = None
 is_streaming = False
@@ -321,10 +319,8 @@ def fetch_current_task():
         # Get all tasks and filter in memory to avoid index requirement
         tasks_ref = db.collection('tasks')
         tasks = tasks_ref.order_by('timestamp', direction=firestore.Query.DESCENDING).get()
-        
         task_found = False
         current_time = datetime.now()
-        
         for task_doc in tasks:
             task_data = task_doc.to_dict()
             # Check if task is not completed and is due
@@ -336,7 +332,6 @@ def fetch_current_task():
                     task_sent_time = task_data.get('sentTime', None)
                     task_due_time = task_data.get('dueTime', None)
                     task_found = True
-                    
                     if current_task:
                         task_text = f"Task: {current_task}\nSent: {task_sent_time}"
                         if task_due_time:
@@ -344,16 +339,13 @@ def fetch_current_task():
                         task_display.config(text=task_text)
                     else:
                         task_display.config(text="No current task.")
-                    
                     logging.debug(f"Fetched task: {current_task}, {task_sent_time}, {task_due_time}")
                     break
-        
         if not task_found:
             task_display.config(text="No tasks due at this time.")
             current_task = None
             task_sent_time = None
             task_due_time = None
-            
     except Exception as e:
         logging.error(f"Error fetching task: {e}")
         messagebox.showerror("Error", f"Failed to fetch task: {e}")
@@ -671,7 +663,7 @@ def fetch_recordings():
             if not blob.name.endswith('/'):
                 # Get the public URL
                 blob.make_public()
-                recordings_list.append({
+            recordings_list.append({
                     'id': blob.name,
                     'name': os.path.basename(blob.name),
                     'url': blob.public_url,
@@ -1215,7 +1207,6 @@ def update_clock():
 def toggle_record_voice():
     """Toggle voice recording on/off"""
     global is_recording, recording_thread
-    
     if not is_recording:
         try:
             # Find USB microphone
@@ -1223,13 +1214,11 @@ def toggle_record_voice():
             if mic_index is None:
                 messagebox.showerror("Recording Error", "No microphone found")
                 return
-
             # Show recording notification
             notification_window = tk.Toplevel(root)
             notification_window.title("Recording Notification")
             notification_window.geometry("400x200")
             notification_window.attributes('-topmost', True)
-            
             # Center the notification
             notification_window.update_idletasks()
             width = notification_window.winfo_width()
@@ -1237,7 +1226,6 @@ def toggle_record_voice():
             x = (notification_window.winfo_screenwidth() // 2) - (width // 2)
             y = (notification_window.winfo_screenheight() // 2) - (height // 2)
             notification_window.geometry(f'{width}x{height}+{x}+{y}')
-            
             # Add warning message
             warning_label = tk.Label(notification_window, 
                                    text="⚠️ Recording in Progress ⚠️\n\nYou are being recorded.\nThis recording will be saved and uploaded.",
@@ -1245,32 +1233,26 @@ def toggle_record_voice():
                                    fg="red",
                                    justify="center")
             warning_label.pack(pady=20)
-            
             # Add countdown label
             countdown_label = tk.Label(notification_window, 
                                      text="Recording will stop in: 10",
                                      font=("DejaVu Sans", 12))
             countdown_label.pack(pady=10)
-
             is_recording = True
             record_voice_btn.config(bg="red", text="⏹️")
             logging.debug("Voice recording started.")
-
             def record_audio():
                 # Set up audio recording
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 filename = f"audio_{timestamp}.wav"
-                
                 # Record audio for 10 seconds
                 duration = 10  # seconds
                 sample_rate = 44100
-                
                 # Record audio
                 recording = sd.rec(int(duration * sample_rate),
                                  samplerate=sample_rate,
                                  channels=1,
                                  dtype='float32')
-                
                 # Update countdown
                 for i in range(10, 0, -1):
                     if not is_recording:
@@ -1278,26 +1260,19 @@ def toggle_record_voice():
                     countdown_label.config(text=f"Recording will stop in: {i}")
                     notification_window.update()
                     time.sleep(1)
-                
                 # Stop recording
                 sd.stop()
-                
                 # Save the recording
                 sf.write(filename, recording, sample_rate)
-                
                 # Upload to Firebase
                 upload_audio_to_firebase(filename)
-                
                 # Clean up
                 if os.path.exists(filename):
                     os.remove(filename)
-                
                 # Close notification window
                 notification_window.destroy()
-
             recording_thread = threading.Thread(target=record_audio, daemon=True)
             recording_thread.start()
-
         except Exception as e:
             logging.error(f"Error starting voice recording: {e}")
             messagebox.showerror("Recording Error", f"Failed to start recording: {e}")
@@ -1344,6 +1319,27 @@ def upload_audio_to_firebase(local_path):
     except Exception as e:
         logger.error(f"Upload Error: {e}")
         messagebox.showerror("Upload Error", f"Failed to upload audio: {str(e)}")
+
+def firestore_listener_thread():
+    doc_ref = db.collection('commands').document('record')
+    last_state = False
+    print("Listening for record commands in GUI...")
+    while True:
+        doc = doc_ref.get()
+        if doc.exists:
+            data = doc.to_dict()
+            if data.get('record', False) and not last_state:
+                print("Remote recording requested!")
+                # Start the recording process (call your local recording function)
+                # You can call your start_recording() function here, or
+                # if you want to use camera_server.py, use subprocess:
+                subprocess.run(['python3', 'camera_server.py'])
+                # Reset Firestore trigger
+                doc_ref.set({'record': False}, merge=True)
+                last_state = True
+            else:
+                last_state = data.get('record', False)
+        time.sleep(2)
 
 # Create the main window and UI elements
 root = tk.Tk()
@@ -1469,22 +1465,8 @@ def on_closing():
     try:
         # Stop task checker
         stop_task_checker()
-        
-        # Stop Flask server if it's running
-        if flask_server_running:
-            try:
-                # First stop the camera stream
-                requests.post('http://localhost:5000/stop-stream')
-                # Then stop the server
-                flask_server_process.terminate()
-                flask_server_process.wait(timeout=5)
-                logging.info("Flask server stopped during shutdown")
-            except Exception as e:
-                logging.error(f"Error stopping Flask server during shutdown: {e}")
-        
         # Clean up temporary files
         cleanup_temp_files()
-        
         # Destroy the window
         root.destroy()
     except Exception as e:
@@ -1492,5 +1474,9 @@ def on_closing():
         root.destroy()
 
 root.protocol("WM_DELETE_WINDOW", on_closing)
+
+# Start the Firestore listener thread
+listener_thread = threading.Thread(target=firestore_listener_thread, daemon=True)
+listener_thread.start()
 
 root.mainloop()
