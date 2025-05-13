@@ -1249,7 +1249,7 @@ def toggle_record_voice():
         record_voice_btn.config(bg=BUTTON_BG, fg="white", text="Record Voice")
 
 def upload_audio_to_firebase(local_path):
-    """Upload audio file to Firebase Storage"""
+    """Upload audio file to Firebase Storage under voice_notes/"""
     try:
         # Create a unique filename with timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -1258,7 +1258,7 @@ def upload_audio_to_firebase(local_path):
         logger.debug(f"Attempting to upload audio: {local_path}")
         
         # Create the blob with the correct path for audio files
-        audio_blob = bucket.blob(f"recordings/{filename}")
+        audio_blob = bucket.blob(f"voice_notes/{filename}")
         
         # Upload the file with content type
         audio_blob.upload_from_filename(
