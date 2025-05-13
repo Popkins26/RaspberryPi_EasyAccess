@@ -694,6 +694,32 @@ def convert_mp3_to_wav(mp3_path):
         logging.error(f"Conversion error: {e}")
         raise
 
+def get_selected_recording():
+    """Get the currently selected recording from the listbox"""
+    try:
+        selection = media_listbox.curselection()
+        if not selection:
+            messagebox.showinfo("Selection Error", "Please select a recording to play")
+            return None
+            
+        # Get the selected item text
+        selected_text = media_listbox.get(selection[0])
+        
+        # Fetch recordings to get the full data
+        recordings = fetch_recordings()
+        if not recordings:
+            return None
+            
+        # Find the matching recording
+        for recording in recordings:
+            if recording['name'] in selected_text:
+                return recording
+                
+        return None
+    except Exception as e:
+        logging.error(f"Error getting selected recording: {e}")
+        return None
+
 def play_recording(recording):
     global is_playing, playback_thread, audio_data, sample_rate, playback_position, playback_duration, playback_stop_event
     try:
@@ -786,6 +812,7 @@ def play_recording(recording):
         messagebox.showerror("Playback Error", f"Failed to play recording: {str(e)}")
 
 def playback_audio(audio_data, sample_rate):
+    """Play audio data through the sound device"""
     global playback_position, is_playing
     
     try:
@@ -836,19 +863,26 @@ def playback_audio(audio_data, sample_rate):
         messagebox.showerror("Playback Error", f"Error during playback: {str(e)}")
 
 def update_playback_status():
-    # Update UI to reflect current playback status
+    """Update the state of playback control buttons"""
     if is_playing:
         play_btn.config(state="disabled")
         pause_btn.config(state="normal")
         resume_btn.config(state="disabled")
         stop_btn.config(state="normal")
     else:
-        play_btn.config(state="normal")
-        pause_btn.config(state="disabled")
-        resume_btn.config(state="disabled")
-        stop_btn.config(state="disabled")
+        if playback_position > 0:  # If we're paused
+            play_btn.config(state="disabled")
+            pause_btn.config(state="disabled")
+            resume_btn.config(state="normal")
+            stop_btn.config(state="normal")
+        else:  # If we're stopped
+            play_btn.config(state="normal")
+            pause_btn.config(state="disabled")
+            resume_btn.config(state="disabled")
+            stop_btn.config(state="disabled")
 
 def pause_recording():
+    """Pause the current playback"""
     global is_playing
     try:
         if is_playing:
@@ -863,6 +897,7 @@ def pause_recording():
         logging.error(f"Pause Error: {e}")
 
 def resume_recording():
+    """Resume playback from where it was paused"""
     global is_playing, playback_thread, playback_position
     try:
         if not is_playing and audio_data is not None:
@@ -888,6 +923,7 @@ def resume_recording():
         messagebox.showerror("Resume Error", f"Failed to resume playback: {str(e)}")
 
 def stop_playback():
+    """Stop the current playback"""
     global is_playing, playback_position
     try:
         logging.debug("Stopping playback...")
