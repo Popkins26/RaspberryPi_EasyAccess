@@ -412,12 +412,11 @@ def start_recording():
             messagebox.showerror("Recording Error", "No camera found")
             return
 
-        # Show recording notification
+        # Show recording notification (only for video)
         notification_window = tk.Toplevel(root)
         notification_window.title("Recording Notification")
         notification_window.geometry("400x200")
         notification_window.attributes('-topmost', True)
-        
         # Center the notification
         notification_window.update_idletasks()
         width = notification_window.winfo_width()
@@ -425,7 +424,6 @@ def start_recording():
         x = (notification_window.winfo_screenwidth() // 2) - (width // 2)
         y = (notification_window.winfo_screenheight() // 2) - (height // 2)
         notification_window.geometry(f'{width}x{height}+{x}+{y}')
-        
         # Add warning message
         warning_label = tk.Label(notification_window, 
                                text="⚠️ Recording in Progress ⚠️\n\nYou are being recorded.\nThis recording will be saved and uploaded.",
@@ -433,7 +431,6 @@ def start_recording():
                                fg="red",
                                justify="center")
         warning_label.pack(pady=20)
-        
         # Add countdown label
         countdown_label = tk.Label(notification_window, 
                                  text="Recording will stop in: 10",
@@ -441,41 +438,35 @@ def start_recording():
         countdown_label.pack(pady=10)
 
         is_recording = True
-        record_voice_btn.config(bg="red", text="⏹️")
         logging.debug("Recording started.")
 
         def record_video():
             """Record video for 10 seconds"""
             global camera, is_streaming
-            
             try:
                 # Set up video writer
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 filename = f"video_{timestamp}.mp4"
                 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
                 out = cv2.VideoWriter(filename, fourcc, 30.0, (640, 480))
-                
                 is_streaming = True
                 start_time = time.time()
-                
                 while is_streaming and (time.time() - start_time) < 10:
                     ret, frame = camera.read()
                     if ret:
                         out.write(frame)
                         time.sleep(0.033)  # ~30 fps
-                
                 out.release()
-                
                 # Upload to Firebase
                 upload_video_to_firebase(filename)
-                
                 # Clean up
                 if os.path.exists(filename):
                     os.remove(filename)
-                
             except Exception as e:
                 logger.error(f"Error recording video: {e}")
                 is_streaming = False
+            finally:
+                notification_window.destroy()
 
         recording_thread = threading.Thread(target=record_video, daemon=True)
         recording_thread.start()
@@ -484,13 +475,12 @@ def start_recording():
         logging.error(f"Error starting recording: {e}")
         messagebox.showerror("Recording Error", f"Failed to start recording: {e}")
         is_recording = False
-        record_voice_btn.config(bg=BUTTON_BG, text=MIC_ICON)
 
 def stop_recording():
     """Stop recording"""
     global is_recording
     is_recording = False
-    record_voice_btn.config(bg=BUTTON_BG, text=MIC_ICON)
+    record_voice_btn.config(bg=BUTTON_BG, text="Record Voice")
     release_camera()
 
 def upload_video_to_firebase(local_path):
@@ -1214,32 +1204,9 @@ def toggle_record_voice():
             if mic_index is None:
                 messagebox.showerror("Recording Error", "No microphone found")
                 return
-            # Show recording notification
-            notification_window = tk.Toplevel(root)
-            notification_window.title("Recording Notification")
-            notification_window.geometry("400x200")
-            notification_window.attributes('-topmost', True)
-            # Center the notification
-            notification_window.update_idletasks()
-            width = notification_window.winfo_width()
-            height = notification_window.winfo_height()
-            x = (notification_window.winfo_screenwidth() // 2) - (width // 2)
-            y = (notification_window.winfo_screenheight() // 2) - (height // 2)
-            notification_window.geometry(f'{width}x{height}+{x}+{y}')
-            # Add warning message
-            warning_label = tk.Label(notification_window, 
-                                   text="⚠️ Recording in Progress ⚠️\n\nYou are being recorded.\nThis recording will be saved and uploaded.",
-                                   font=("DejaVu Sans", 14, "bold"),
-                                   fg="red",
-                                   justify="center")
-            warning_label.pack(pady=20)
-            # Add countdown label
-            countdown_label = tk.Label(notification_window, 
-                                     text="Recording will stop in: 10",
-                                     font=("DejaVu Sans", 12))
-            countdown_label.pack(pady=10)
             is_recording = True
-            record_voice_btn.config(bg="red", text="⏹️")
+            # Change button to red pause
+            record_voice_btn.config(bg="red", fg="white", text="Pause")
             logging.debug("Voice recording started.")
             def record_audio():
                 # Set up audio recording
@@ -1253,12 +1220,10 @@ def toggle_record_voice():
                                  samplerate=sample_rate,
                                  channels=1,
                                  dtype='float32')
-                # Update countdown
+                # Countdown (no notification window)
                 for i in range(10, 0, -1):
                     if not is_recording:
                         break
-                    countdown_label.config(text=f"Recording will stop in: {i}")
-                    notification_window.update()
                     time.sleep(1)
                 # Stop recording
                 sd.stop()
@@ -1269,17 +1234,19 @@ def toggle_record_voice():
                 # Clean up
                 if os.path.exists(filename):
                     os.remove(filename)
-                # Close notification window
-                notification_window.destroy()
+                # Reset button state
+                is_recording = False
+                record_voice_btn.config(bg=BUTTON_BG, fg="white", text="Record Voice")
             recording_thread = threading.Thread(target=record_audio, daemon=True)
             recording_thread.start()
         except Exception as e:
             logging.error(f"Error starting voice recording: {e}")
             messagebox.showerror("Recording Error", f"Failed to start recording: {e}")
             is_recording = False
-            record_voice_btn.config(bg=BUTTON_BG, text=MIC_ICON)
+            record_voice_btn.config(bg=BUTTON_BG, fg="white", text="Record Voice")
     else:
         stop_recording()
+        record_voice_btn.config(bg=BUTTON_BG, fg="white", text="Record Voice")
 
 def upload_audio_to_firebase(local_path):
     """Upload audio file to Firebase Storage"""
@@ -1355,12 +1322,6 @@ clock_label = tk.Label(title_frame, font=("DejaVu Sans Mono", 24), bg=STANDARD_B
 clock_label.pack(side='right', padx=(0, 20), anchor='e')
 update_clock()
 
-# Flask server status label below the clock, right-aligned
-flask_status_frame = tk.Frame(root, bg=STANDARD_BG)
-flask_status_frame.pack(fill='x', padx=20, pady=(0, 5))
-flask_status_label = tk.Label(flask_status_frame, text="Flask Server: Stopped", bg=STANDARD_BG, fg="#2C3E50", font=("DejaVu Sans", 11))
-flask_status_label.pack(side='right', anchor='e')
-
 # --- MAIN CONTENT FRAME (TWO COLUMNS, FLIPPED) ---
 content_frame = tk.Frame(root, bg=STANDARD_BG)
 content_frame.pack(fill='both', expand=True, padx=20, pady=10)
@@ -1368,7 +1329,7 @@ content_frame.grid_rowconfigure(0, weight=1)
 content_frame.grid_columnconfigure(0, weight=1, minsize=250)  # Left: buttons
 content_frame.grid_columnconfigure(1, weight=3, minsize=500)  # Right: interactive sections
 
-# --- LEFT COLUMN: Profile, Emergency, Flask, Exit, Shutdown ---
+# --- LEFT COLUMN: Profile, Emergency, Exit, Shutdown ---
 left_col = tk.Frame(content_frame, bg=STANDARD_BG)
 left_col.grid(row=0, column=0, sticky='ns', padx=(0, 20), pady=0)
 left_col.grid_propagate(True)
@@ -1384,12 +1345,6 @@ greeting_label.pack(pady=2)
 # Emergency button (centered)
 emergency_btn = create_small_button(left_col, "EMERGENCY", emergency_pressed, "#E74C3C", width=18)
 emergency_btn.pack(pady=15, fill='x', expand=True)
-
-# Flask server controls (stacked)
-flask_btn = create_small_button(left_col, "Launch Flask Server", launch_flask_server, "#27AE60", width=18)
-flask_btn.pack(pady=(10, 2), fill='x', expand=True)
-flask_toggle_btn = create_small_button(left_col, "Toggle Flask Server", lambda: toggle_flask_server(), "#F39C12", fg_color="#222", width=18)
-flask_toggle_btn.pack(pady=2, fill='x', expand=True)
 
 # Exit GUI and Shutdown (stacked)
 exit_btn = create_small_button(left_col, "Exit GUI", lambda: on_closing(), "#34495E", width=18)
@@ -1412,6 +1367,7 @@ camera_row.grid_columnconfigure(0, weight=1)
 camera_row.grid_columnconfigure(1, weight=1)
 camera_btn = create_small_button(camera_row, "Open Camera View", show_camera, BUTTON_BG, width=16)
 camera_btn.grid(row=0, column=0, padx=6, pady=8, sticky='e')
+# Record Voice button with dynamic text (no emoji)
 record_voice_btn = create_small_button(camera_row, "Record Voice", toggle_record_voice, BUTTON_BG, width=16)
 record_voice_btn.grid(row=0, column=1, padx=6, pady=8, sticky='w')
 
