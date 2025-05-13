@@ -1248,20 +1248,36 @@ def toggle_record_voice():
             record_voice_btn.config(bg="red", fg="white", text="Stop Recording")
             logging.debug("Voice recording started.")
 
-            # Start audio recording
+            # Start audio recording with improved settings
             audio_start_time = datetime.now()
-            sample_rate = 44100
+            sample_rate = 48000  # Increased sample rate for better quality
             audio_recording = []
 
             def callback(indata, frames, time_info, status):
                 if is_recording:
-                    audio_recording.append(indata.copy())
+                    # Apply basic noise reduction by removing DC offset and normalizing
+                    audio = indata.copy()
+                    # Remove DC offset
+                    audio = audio - np.mean(audio)
+                    # Normalize to prevent clipping
+                    max_val = np.max(np.abs(audio))
+                    if max_val > 0:
+                        audio = audio / max_val * 0.9  # Leave some headroom
+                    audio_recording.append(audio)
                 else:
                     raise sd.CallbackStop()
 
             # Start the stream in a thread so the GUI doesn't freeze
             def record_audio_stream():
-                with sd.InputStream(samplerate=sample_rate, channels=1, callback=callback):
+                # Configure input stream with better settings
+                with sd.InputStream(
+                    samplerate=sample_rate,
+                    channels=1,
+                    callback=callback,
+                    blocksize=2048,  # Increased block size for better stability
+                    dtype=np.float32,
+                    device=mic_index
+                ) as stream:
                     while is_recording:
                         time.sleep(0.1)
 
@@ -1272,15 +1288,32 @@ def toggle_record_voice():
                 
                 # First save as WAV
                 audio_data = np.concatenate(audio_recording, axis=0)
+                
+                # Apply additional noise reduction
+                # Remove DC offset
+                audio_data = audio_data - np.mean(audio_data)
+                
+                # Apply a simple noise gate
+                noise_floor = 0.01  # Adjust this value based on your noise level
+                audio_data[np.abs(audio_data) < noise_floor] = 0
+                
+                # Normalize the audio
+                max_val = np.max(np.abs(audio_data))
+                if max_val > 0:
+                    audio_data = audio_data / max_val * 0.9  # Leave some headroom
+                
+                # Save the processed audio
                 sf.write(temp_wav, audio_data, sample_rate)
                 
                 try:
-                    # Convert WAV to MP3 using ffmpeg
+                    # Convert WAV to MP3 using ffmpeg with improved settings
                     subprocess.run([
                         "/usr/bin/ffmpeg",
                         '-i', temp_wav,
                         '-codec:a', 'libmp3lame',
-                        '-qscale:a', '2',  # High quality MP3
+                        '-qscale:a', '0',  # Highest quality MP3
+                        '-ar', '48000',    # Maintain high sample rate
+                        '-af', 'highpass=f=200,lowpass=f=3000',  # Basic EQ to focus on voice frequencies
                         temp_mp3
                     ], check=True, capture_output=True)
                     
