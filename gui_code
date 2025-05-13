@@ -203,61 +203,56 @@ def start_camera_server():
     
     if flask_server_running:
         logger.info("Flask camera server already running.")
-        return
+        return True
     try:
         if camera_server is None:
             camera_server = Flask(__name__)
             
             @camera_server.route('/')
             def index():
-                return "USB Camera Streaming Server"
+                return "USB Camera Recording Server"
             
-            @camera_server.route('/start-stream', methods=['POST'])
-            def start_stream():
+            @camera_server.route('/start-recording', methods=['POST'])
+            def start_recording():
                 global camera, camera_thread, is_streaming
                 
                 try:
                     if is_streaming:
-                        return jsonify({"status": "success", "message": "Camera already streaming"})
+                        return jsonify({"status": "error", "message": "Camera already in use"}), 400
                     
                     if not init_camera():
                         return jsonify({"status": "error", "message": "Failed to initialize camera"}), 500
                     
-                    is_streaming = True
-                    camera_thread = threading.Thread(target=camera_stream)
-                    camera_thread.daemon = True
-                    camera_thread.start()
+                    # Start recording in a separate thread
+                    recording_thread = threading.Thread(target=record_video)
+                    recording_thread.daemon = True
+                    recording_thread.start()
                     
-                    logger.info("Camera stream started")
-                    return jsonify({"status": "success", "message": "Camera stream started"})
+                    logger.info("Video recording started")
+                    return jsonify({"status": "success", "message": "Recording started"})
                 except Exception as e:
-                    logger.error(f"Error starting stream: {e}")
+                    logger.error(f"Error starting recording: {e}")
                     return jsonify({"status": "error", "message": str(e)}), 500
             
-            @camera_server.route('/stop-stream', methods=['POST'])
-            def stop_stream():
+            @camera_server.route('/stop-recording', methods=['POST'])
+            def stop_recording():
                 global is_streaming
                 
                 try:
                     if not is_streaming:
-                        return jsonify({"status": "success", "message": "Camera already stopped"})
+                        return jsonify({"status": "success", "message": "No recording in progress"})
                     
                     release_camera()
-                    return jsonify({"status": "success", "message": "Camera stream stopped"})
+                    return jsonify({"status": "success", "message": "Recording stopped"})
                 except Exception as e:
-                    logger.error(f"Error stopping stream: {e}")
+                    logger.error(f"Error stopping recording: {e}")
                     return jsonify({"status": "error", "message": str(e)}), 500
-            
-            @camera_server.route('/stream')
-            def video_feed():
-                return Response(generate_frames(),
-                              mimetype='multipart/x-mixed-replace; boundary=frame')
             
             @camera_server.route('/status')
             def status():
                 return jsonify({
                     "status": "success",
-                    "is_streaming": is_streaming,
+                    "is_recording": is_streaming,
                     "camera_initialized": camera is not None
                 })
             
@@ -416,41 +411,72 @@ def find_usb_microphone():
         return None
 
 def start_recording():
-    """Start recording from USB microphone"""
+    """Start recording video for 10 seconds"""
     global is_recording, recording_thread, recording_buffer
     try:
-        # Find USB microphone
-        mic_index = find_usb_microphone()
-        if mic_index is None:
-            messagebox.showerror("Recording Error", "No microphone found")
+        # Find USB camera
+        if not init_camera():
+            messagebox.showerror("Recording Error", "No camera found")
             return
 
+        # Show recording notification
+        notification_window = tk.Toplevel(root)
+        notification_window.title("Recording Notification")
+        notification_window.geometry("400x200")
+        notification_window.attributes('-topmost', True)
+        
+        # Center the notification
+        notification_window.update_idletasks()
+        width = notification_window.winfo_width()
+        height = notification_window.winfo_height()
+        x = (notification_window.winfo_screenwidth() // 2) - (width // 2)
+        y = (notification_window.winfo_screenheight() // 2) - (height // 2)
+        notification_window.geometry(f'{width}x{height}+{x}+{y}')
+        
+        # Add warning message
+        warning_label = tk.Label(notification_window, 
+                               text="⚠️ Recording in Progress ⚠️\n\nYou are being recorded.\nThis recording will be saved and uploaded.",
+                               font=("DejaVu Sans", 14, "bold"),
+                               fg="red",
+                               justify="center")
+        warning_label.pack(pady=20)
+        
+        # Add countdown label
+        countdown_label = tk.Label(notification_window, 
+                                 text="Recording will stop in: 10",
+                                 font=("DejaVu Sans", 12))
+        countdown_label.pack(pady=10)
+
         is_recording = True
-        recording_buffer = []
         record_voice_btn.config(bg="red", text="⏹️")
         logging.debug("Recording started.")
 
-        def record_audio():
-            fs = 16000  # Sample rate
-            channels = 1  # Mono recording
-            try:
-                with sd.InputStream(device=mic_index,
-                                  samplerate=fs,
-                                  channels=channels,
-                                  dtype='float32',
-                                  callback=audio_callback):
-                    while is_recording:
-                        sd.sleep(100)
-            except Exception as e:
-                messagebox.showerror("Recording Error", f"An error occurred while recording: {e}")
-                logging.error(f"Recording Error: {e}")
+        def record_video():
+            # Set up video writer
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"video_{timestamp}.mp4"
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            out = cv2.VideoWriter(filename, fourcc, 30.0, (640, 480))
+            
+            is_streaming = True
+            start_time = time.time()
+            
+            while is_streaming and (time.time() - start_time) < 10:
+                ret, frame = camera.read()
+                if ret:
+                    out.write(frame)
+                    time.sleep(0.033)  # ~30 fps
+            
+            out.release()
+            
+            # Upload to Firebase
+            upload_video_to_firebase(filename)
+            
+            # Clean up
+            if os.path.exists(filename):
+                os.remove(filename)
 
-        def audio_callback(indata, frames, time, status):
-            if status:
-                logging.warning(f"Recording status: {status}")
-            recording_buffer.append(indata.copy())
-
-        recording_thread = threading.Thread(target=record_audio, daemon=True)
+        recording_thread = threading.Thread(target=record_video, daemon=True)
         recording_thread.start()
 
     except Exception as e:
@@ -460,111 +486,49 @@ def start_recording():
         record_voice_btn.config(bg=BUTTON_BG, text=MIC_ICON)
 
 def stop_recording():
-    """Stop recording and save the audio file"""
-    global is_recording, recording_thread, recording_buffer
-    try:
-        is_recording = False
-        record_voice_btn.config(bg=BUTTON_BG, text=MIC_ICON)
+    """Stop recording"""
+    global is_recording
+    is_recording = False
+    record_voice_btn.config(bg=BUTTON_BG, text=MIC_ICON)
+    release_camera()
 
-        if recording_thread and recording_thread.is_alive():
-            recording_thread.join()
-            logging.debug("Recording thread stopped.")
-
-        if recording_buffer:
-            fs = 16000
-            filename_wav = f"voice_note_{int(time.time())}.wav"
-            filename_mp3 = filename_wav.replace(".wav", ".mp3")
-
-            # Concatenate all recorded chunks
-            audio_data = np.concatenate(recording_buffer, axis=0)
-            
-            # Normalize the audio
-            audio_data = audio_data / np.max(np.abs(audio_data))
-            audio_data_int16 = np.int16(audio_data * 32767)
-
-            # Save as WAV
-            write(filename_wav, fs, audio_data_int16)
-
-            try:
-                # Convert to MP3
-                sound = AudioSegment.from_wav(filename_wav)
-                sound.export(filename_mp3, format="mp3")
-                os.remove(filename_wav)
-                
-                messagebox.showinfo("Saved", f"Voice note saved as {filename_mp3}. Uploading to Firebase...")
-                upload_to_firebase(filename_mp3)
-            except Exception as e:
-                messagebox.showerror("Conversion Error", f"Failed to convert to MP3: {e}")
-                logging.error(f"MP3 Conversion Error: {e}")
-        else:
-            messagebox.showinfo("Recording", "No audio recorded")
-    except Exception as e:
-        logging.error(f"Error stopping recording: {e}")
-        messagebox.showerror("Recording Error", f"Failed to stop recording: {e}")
-
-def toggle_record_voice():
-    """Toggle voice recording"""
-    if is_recording:
-        stop_recording()
-        record_voice_btn.config(text="Record Voice")
-    else:
-        start_recording()
-        record_voice_btn.config(text="Record Voice")
-
-def upload_to_firebase(local_path):
+def upload_video_to_firebase(local_path):
     try:
         # Create a unique filename with timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"voice_note_{timestamp}.mp3"
+        filename = f"video_{timestamp}.mp4"
         
-        logger.debug(f"Attempting to upload file: {local_path}")
-        logger.debug(f"Using bucket: {bucket.name}")
+        logger.debug(f"Attempting to upload video: {local_path}")
         
-        # Create the blob with the correct path for voice notes (Flutter app)
-        voice_note_blob = bucket.blob(f"voice_notes/{filename}")
-        logger.debug(f"Created voice note blob at path: voice_notes/{filename}")
+        # Create the blob with the correct path for videos
+        video_blob = bucket.blob(f"videos/{filename}")
         
         # Upload the file with content type
-        logger.debug("Starting file upload...")
-        voice_note_blob.upload_from_filename(
+        video_blob.upload_from_filename(
             local_path,
-            content_type='audio/mpeg'
+            content_type='video/mp4'
         )
-        logger.debug("File upload completed")
         
         # Make the file publicly accessible
-        logger.debug("Making file public...")
-        voice_note_blob.make_public()
-        logger.debug("File is now public")
+        video_blob.make_public()
         
         # Get the public URL
-        public_url = voice_note_blob.public_url
-        logger.debug(f"Public URL: {public_url}")
+        public_url = video_blob.public_url
         
-        # Add metadata to Firestore for voice notes (Flutter app)
-        logger.debug("Adding metadata to Firestore for voice notes...")
-        db.collection('voice_notes').add({
+        # Add metadata to Firestore
+        db.collection('videos').add({
             'name': filename,
             'url': public_url,
             'timestamp': firestore.SERVER_TIMESTAMP,
-            'type': 'voice_note'
+            'type': 'video'
         })
-        logger.debug("Voice note metadata added to Firestore")
         
-        # Clean up local file
-        os.remove(local_path)
-        logger.debug("Local file cleaned up")
-        
-        messagebox.showinfo("Success", f"Voice note uploaded successfully!")
+        messagebox.showinfo("Success", f"Video uploaded successfully!")
         logger.info(f"Successfully uploaded {filename} to Firebase Storage")
         
     except Exception as e:
         logger.error(f"Upload Error: {e}")
-        logger.error(f"Error type: {type(e)}")
-        logger.error(f"Error details: {str(e)}")
-        messagebox.showerror("Upload Error", f"Failed to upload voice note: {str(e)}")
-        # Keep the local file if upload fails
-        logger.info(f"Keeping local file at {local_path} due to upload failure")
+        messagebox.showerror("Upload Error", f"Failed to upload video: {str(e)}")
 
 def task_done():
     global current_task, task_sent_time, task_due_time
@@ -1164,88 +1128,17 @@ def upload_ngrok_url_to_firebase():
         print(f"Error uploading ngrok URL to Firebase: {e}")
 
 def launch_flask_server():
-    """Launch the Flask server and start camera, then start ngrok and upload URL to Firebase"""
-    global flask_server_process, flask_server_running
-    try:
-        if flask_server_running:
-            messagebox.showinfo("Flask Server", "Flask server is already running!")
-            return
-        # Launch Flask server in a separate process
-        flask_server_process = subprocess.Popen(['python', 'camera_server.py'],
-                                              stdout=subprocess.PIPE,
-                                              stderr=subprocess.PIPE)
-        # Wait a moment to check if server started successfully
-        time.sleep(2)
-        if flask_server_process.poll() is None:  # Process is still running
-            flask_server_running = True
-            flask_status_label.config(text="Flask Server: Running", fg="green")
-            # Start ngrok in a subprocess
-            ngrok_process = subprocess.Popen(['ngrok', 'http', '5000'],
-                                             stdout=subprocess.PIPE,
-                                             stderr=subprocess.PIPE)
-            # Wait a moment for ngrok to start
-            time.sleep(3)
-            # Upload ngrok URL to Firebase
-            upload_ngrok_url_to_firebase()
-            # Start the camera stream
-            try:
-                response = requests.post('http://localhost:5000/start-stream')
-                if response.status_code == 200:
-                    messagebox.showinfo("Flask Server", 
-                        "Flask server, camera, and ngrok started successfully!\n\n"
-                        "You can view the camera feed at the ngrok URL in Firebase.")
-                else:
-                    messagebox.showwarning("Camera Warning", 
-                        "Server started but camera failed to start. Please try again.")
-            except Exception as e:
-                messagebox.showwarning("Camera Warning", 
-                    f"Server started but camera failed to start: {e}")
-        else:
-            # Get error output if process failed
-            _, stderr = flask_server_process.communicate()
-            error_msg = stderr.decode() if stderr else "Unknown error"
-            flask_server_running = False
-            flask_status_label.config(text="Flask Server: Failed", fg="red")
-            messagebox.showerror("Flask Server Error", f"Failed to start Flask server:\n{error_msg}")
-    except Exception as e:
-        flask_server_running = False
-        flask_status_label.config(text="Flask Server: Error", fg="red")
-        messagebox.showerror("Flask Server Error", f"Error launching Flask server: {e}")
+    """This function is deprecated - server is now controlled from the app"""
+    pass
 
 def shutdown_flask_server():
-    """Shutdown the Flask server"""
-    global flask_server_process, flask_server_running
-    
-    if flask_server_process and flask_server_running:
-        try:
-            flask_server_process.terminate()
-            flask_server_process.wait(timeout=5)
-            flask_server_running = False
-            flask_status_label.config(text="Flask Server: Stopped", fg="black")
-        except Exception as e:
-            messagebox.showerror("Flask Server Error", f"Error stopping Flask server: {e}")
+    """This function is deprecated - server is now controlled from the app"""
+    pass
 
 # Add Flask server toggle function
 def toggle_flask_server():
-    """Toggle the Flask server on/off"""
-    global flask_server_running, flask_server_process
-    
-    if flask_server_running:
-        # Stop the server
-        try:
-            # First stop the camera stream
-            requests.post('http://localhost:5000/stop-stream')
-            # Then stop the server
-            flask_server_process.terminate()
-            flask_server_process.wait(timeout=5)
-            flask_server_running = False
-            flask_status_label.config(text="Flask Server: Stopped", fg="black")
-            messagebox.showinfo("Flask Server", "Flask server stopped successfully!")
-        except Exception as e:
-            messagebox.showerror("Flask Server Error", f"Error stopping Flask server: {e}")
-    else:
-        # Start the server
-        launch_flask_server()
+    """This function is deprecated - server is now controlled from the app"""
+    pass
 
 # Add new camera preview window class
 class CameraPreviewWindow:
