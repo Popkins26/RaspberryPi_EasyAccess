@@ -124,6 +124,10 @@ stop_task_check = threading.Event()
 flask_server_process = None
 flask_server_running = False
 
+# Audio recording variables
+audio_recording = []
+audio_start_time = None
+
 # --- Smaller button style for 7-inch display ---
 def create_small_button(parent, text, command, bg_color, fg_color="white", width=12):
     return tk.Button(parent, text=text, command=command, bg=bg_color, fg=fg_color,
@@ -1195,57 +1199,57 @@ def update_clock():
     root.after(1000, update_clock)  # Still update every second for accuracy
 
 def toggle_record_voice():
-    """Toggle voice recording on/off"""
-    global is_recording, recording_thread
+    """Toggle voice recording on/off (user controlled duration)"""
+    global is_recording, recording_thread, audio_recording, audio_start_time
+
     if not is_recording:
         try:
-            # Find USB microphone
             mic_index = find_usb_microphone()
             if mic_index is None:
                 messagebox.showerror("Recording Error", "No microphone found")
                 return
             is_recording = True
-            # Change button to red pause
             record_voice_btn.config(bg="red", fg="white", text="Pause")
             logging.debug("Voice recording started.")
-            def record_audio():
-                # Set up audio recording
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                filename = f"audio_{timestamp}.wav"
-                # Record audio for 10 seconds
-                duration = 10  # seconds
-                sample_rate = 44100
-                # Record audio
-                recording = sd.rec(int(duration * sample_rate),
-                                 samplerate=sample_rate,
-                                 channels=1,
-                                 dtype='float32')
-                # Countdown (no notification window)
-                for i in range(10, 0, -1):
-                    if not is_recording:
-                        break
-                    time.sleep(1)
-                # Stop recording
-                sd.stop()
+
+            # Start audio recording
+            audio_start_time = datetime.now()
+            sample_rate = 44100
+            audio_recording = []
+
+            def callback(indata, frames, time_info, status):
+                if is_recording:
+                    audio_recording.append(indata.copy())
+                else:
+                    raise sd.CallbackStop()
+
+            # Start the stream in a thread so the GUI doesn't freeze
+            def record_audio_stream():
+                with sd.InputStream(samplerate=sample_rate, channels=1, callback=callback):
+                    while is_recording:
+                        time.sleep(0.1)
+
                 # Save the recording
-                sf.write(filename, recording, sample_rate)
-                # Upload to Firebase
+                timestamp = audio_start_time.strftime("%Y%m%d_%H%M%S")
+                filename = f"audio_{timestamp}.wav"
+                audio_data = np.concatenate(audio_recording, axis=0)
+                sf.write(filename, audio_data, sample_rate)
                 upload_audio_to_firebase(filename)
-                # Clean up
                 if os.path.exists(filename):
                     os.remove(filename)
-                # Reset button state
-                is_recording = False
                 record_voice_btn.config(bg=BUTTON_BG, fg="white", text="Record Voice")
-            recording_thread = threading.Thread(target=record_audio, daemon=True)
+
+            recording_thread = threading.Thread(target=record_audio_stream, daemon=True)
             recording_thread.start()
+
         except Exception as e:
             logging.error(f"Error starting voice recording: {e}")
             messagebox.showerror("Recording Error", f"Failed to start recording: {e}")
             is_recording = False
             record_voice_btn.config(bg=BUTTON_BG, fg="white", text="Record Voice")
     else:
-        stop_recording()
+        # Stop recording when pressed again
+        is_recording = False
         record_voice_btn.config(bg=BUTTON_BG, fg="white", text="Record Voice")
 
 def upload_audio_to_firebase(local_path):
@@ -1367,7 +1371,6 @@ camera_row.grid_columnconfigure(0, weight=1)
 camera_row.grid_columnconfigure(1, weight=1)
 camera_btn = create_small_button(camera_row, "Open Camera View", show_camera, BUTTON_BG, width=16)
 camera_btn.grid(row=0, column=0, padx=6, pady=8, sticky='e')
-# Record Voice button with dynamic text (no emoji)
 record_voice_btn = create_small_button(camera_row, "Record Voice", toggle_record_voice, BUTTON_BG, width=16)
 record_voice_btn.grid(row=0, column=1, padx=6, pady=8, sticky='w')
 
