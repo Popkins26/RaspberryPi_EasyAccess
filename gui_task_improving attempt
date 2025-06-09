@@ -517,8 +517,9 @@ def emergency_pressed():
         messagebox.showerror("Error", f"Failed to send emergency notification: {e}")
 
 def shutdown_pi():
-    """Shutdown the Raspberry Pi"""
-    if messagebox.askyesno("Shutdown", "Are you sure you want to shutdown the Raspberry Pi?"):
+    """Show confirmation dialog before shutting down"""
+    result = messagebox.askyesno("Shutdown", "Are you sure you want to shutdown the Raspberry Pi?")
+    if result:
         # Send offline status before shutting down
         send_offline_status()
         shutdown_flask_server()  # Stop Flask server first
@@ -1699,7 +1700,7 @@ content_frame.grid_rowconfigure(0, weight=1)
 content_frame.grid_columnconfigure(0, weight=1, minsize=300)  # Left: profile, task, buttons
 content_frame.grid_columnconfigure(1, weight=2, minsize=600)  # Right: camera, recordings
 
-# --- LEFT COLUMN: Profile, Task, Emergency, Exit, Shutdown ---
+# --- LEFT COLUMN: Profile, Task, Exit, Shutdown ---
 left_col = tk.Frame(content_frame, bg=STANDARD_BG)
 left_col.grid(row=0, column=0, sticky='ns', padx=(0, 20), pady=0)
 left_col.grid_propagate(True)
@@ -1712,51 +1713,54 @@ profile_label.pack()
 greeting_label = tk.Label(left_col, text="", bg=STANDARD_BG, fg="#2C3E50", font=("DejaVu Sans", 12))
 greeting_label.pack(pady=2)
 
-# Task Display (moved from right to left)
+# Task Display (bigger, takes most of the space)
 task_frame = tk.Frame(left_col, bg=STANDARD_BG)
-task_frame.pack(pady=10, fill='x', expand=True)
+task_frame.pack(pady=10, fill='both', expand=True)
 
 task_display = tk.Label(
     task_frame, 
     text="Loading task...", 
-    font=("DejaVu Sans", 12), 
+    font=("DejaVu Sans", 14), 
     bg="white", 
     fg="#2C3E50", 
-    wraplength=280,  # Increased width
+    wraplength=280,
     justify="center", 
     relief="sunken", 
     borderwidth=2, 
-    width=35,  # Increased width
-    height=4   # Increased height
+    width=35,
+    height=8   # Made much bigger
 )
-task_display.pack(padx=8, pady=8, fill='x', expand=True)
+task_display.pack(padx=8, pady=8, fill='both', expand=True)
 
-# Task buttons
+# Task buttons at the very bottom
 task_btns = tk.Frame(task_frame, bg=STANDARD_BG)
-task_btns.pack(pady=5)
-task_done_btn = create_small_button(task_btns, "Task Done", task_done, "#27AE60", width=12)
+task_btns.pack(side='bottom', pady=5, fill='x')
+
+# Task Done and Snooze buttons
+task_action_frame = tk.Frame(task_btns, bg=STANDARD_BG)
+task_action_frame.pack(fill='x')
+task_done_btn = create_small_button(task_action_frame, "Task Done", task_done, "#27AE60", width=12)
 task_done_btn.pack(side='left', padx=3, fill='x', expand=True)
-snooze_btn = create_small_button(task_btns, "Snooze", snooze_task, "#F39C12", fg_color="#222", width=12)
+snooze_btn = create_small_button(task_action_frame, "Snooze", snooze_task, "#F39C12", fg_color="#222", width=12)
 snooze_btn.pack(side='left', padx=3, fill='x', expand=True)
 
-# Emergency button (centered)
-emergency_btn = create_small_button(left_col, "EMERGENCY", emergency_pressed, "#E74C3C", width=18)
-emergency_btn.pack(pady=15, fill='x', expand=True)
+# Exit GUI and Shutdown buttons below task buttons
+exit_shutdown_frame = tk.Frame(task_btns, bg=STANDARD_BG)
+exit_shutdown_frame.pack(fill='x', pady=(5, 0))
+exit_btn = create_small_button(exit_shutdown_frame, "Exit GUI", on_closing, "#34495E", width=12)
+exit_btn.pack(side='left', padx=3, fill='x', expand=True)
+shutdown_btn = create_small_button(exit_shutdown_frame, "Shutdown", shutdown_pi, "#555555", width=12)
+shutdown_btn.pack(side='left', padx=3, fill='x', expand=True)
 
-# Exit GUI and Shutdown (stacked)
-exit_btn = create_small_button(left_col, "Exit GUI", lambda: on_closing(), "#34495E", width=18)
-exit_btn.pack(pady=5, fill='x', expand=True)
-shutdown_btn = create_small_button(left_col, "Shutdown", shutdown_pi, "#555555", width=18)
-shutdown_btn.pack(pady=5, fill='x', expand=True)
-
-# --- RIGHT COLUMN: Camera, Recordings ---
+# --- RIGHT COLUMN: Camera, Emergency, Recordings ---
 right_col = tk.Frame(content_frame, bg=STANDARD_BG)
 right_col.grid(row=0, column=1, sticky='nsew')
-right_col.grid_rowconfigure(0, weight=0)
-right_col.grid_rowconfigure(1, weight=1)
+right_col.grid_rowconfigure(0, weight=0)  # Camera controls
+right_col.grid_rowconfigure(1, weight=0)  # Emergency button
+right_col.grid_rowconfigure(2, weight=1)  # Recordings
 right_col.grid_columnconfigure(0, weight=1)
 
-# Camera controls (centered)
+# Camera controls (top)
 camera_row = tk.Frame(right_col, bg=STANDARD_BG)
 camera_row.grid(row=0, column=0, pady=8, sticky='ew')
 camera_row.grid_columnconfigure(0, weight=1)
@@ -1766,15 +1770,55 @@ camera_btn.grid(row=0, column=0, padx=6, pady=8, sticky='e')
 record_voice_btn = create_small_button(camera_row, "Record Voice", toggle_record_voice, BUTTON_BG, width=16)
 record_voice_btn.grid(row=0, column=1, padx=6, pady=8, sticky='w')
 
-# Recordings controls (taller, scalable)
+# Emergency button (big, spans full width)
+emergency_frame = tk.Frame(right_col, bg=STANDARD_BG)
+emergency_frame.grid(row=1, column=0, pady=8, sticky='ew')
+emergency_btn = tk.Button(
+    emergency_frame,
+    text="EMERGENCY",
+    command=emergency_pressed,
+    bg="#E74C3C",
+    fg="white",
+    font=("DejaVu Sans", 18, "bold"),
+    height=2,
+    relief="raised",
+    borderwidth=3,
+    activebackground="#C0392B",
+    activeforeground="white"
+)
+emergency_btn.pack(fill='x', padx=8)
+
+# Recordings controls (smaller but still scrollable)
 media_row = tk.Frame(right_col, bg=STANDARD_BG)
-media_row.grid(row=1, column=0, padx=8, pady=8, sticky='nsew')
+media_row.grid(row=2, column=0, padx=8, pady=8, sticky='nsew')
 media_row.grid_rowconfigure(0, weight=1)
 media_row.grid_columnconfigure(0, weight=1)
-media_listbox = tk.Listbox(media_row, font=("DejaVu Sans", 12), width=50, height=10, bg="white", fg="#2C3E50", selectbackground=BUTTON_BG, selectforeground="white", relief="sunken", borderwidth=2)
-media_listbox.grid(row=0, column=0, padx=8, pady=8, sticky='nsew')
+
+# Add a label for recordings
+recordings_label = tk.Label(media_row, text="Recordings", font=("DejaVu Sans", 14, "bold"), bg=STANDARD_BG, fg="#2C3E50")
+recordings_label.grid(row=0, column=0, pady=(0, 8), sticky='w')
+
+media_listbox = tk.Listbox(
+    media_row, 
+    font=("DejaVu Sans", 11), 
+    width=45, 
+    height=8,  # Made smaller
+    bg="white", 
+    fg="#2C3E50", 
+    selectbackground=BUTTON_BG, 
+    selectforeground="white", 
+    relief="sunken", 
+    borderwidth=2
+)
+media_listbox.grid(row=1, column=0, padx=8, pady=8, sticky='nsew')
+
+# Add scrollbar for recordings
+scrollbar = tk.Scrollbar(media_row, orient="vertical", command=media_listbox.yview)
+scrollbar.grid(row=1, column=1, sticky='ns')
+media_listbox.configure(yscrollcommand=scrollbar.set)
+
 media_btns = tk.Frame(media_row, bg=STANDARD_BG)
-media_btns.grid(row=1, column=0, pady=2, sticky='ew')
+media_btns.grid(row=2, column=0, columnspan=2, pady=2, sticky='ew')
 play_btn = create_small_button(media_btns, "Play", lambda: play_recording(get_selected_recording()), BUTTON_BG, width=8)
 play_btn.pack(side='left', padx=2, fill='x', expand=True)
 pause_btn = create_small_button(media_btns, "Pause", pause_recording, BUTTON_BG, width=8)
@@ -1798,20 +1842,23 @@ start_pi_status_monitor()  # Start Pi status monitoring
 
 # Update the cleanup on window close
 def on_closing():
-    try:
-        # Stop task checker
-        stop_task_checker()
-        # Stop Pi status monitor
-        stop_pi_status_monitor()
-        # Send offline status
-        send_offline_status()
-        # Clean up temporary files
-        cleanup_temp_files()
-        # Destroy the window
-        root.destroy()
-    except Exception as e:
-        logging.error(f"Error during shutdown: {e}")
-        root.destroy()
+    """Show confirmation dialog before exiting"""
+    result = messagebox.askyesno("Exit GUI", "Are you sure you want to exit?")
+    if result:
+        try:
+            # Stop task checker
+            stop_task_checker()
+            # Stop Pi status monitor
+            stop_pi_status_monitor()
+            # Send offline status
+            send_offline_status()
+            # Clean up temporary files
+            cleanup_temp_files()
+            # Destroy the window
+            root.destroy()
+        except Exception as e:
+            logging.error(f"Error during shutdown: {e}")
+            root.destroy()
 
 root.protocol("WM_DELETE_WINDOW", on_closing)
 
