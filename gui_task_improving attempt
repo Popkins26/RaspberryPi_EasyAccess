@@ -416,7 +416,7 @@ def fetch_user_data():
                     if response.status_code == 200:
                         image_data = response.content
                         image = Image.open(io.BytesIO(image_data))
-                        image = image.resize((100, 100), Image.Resampling.LANCZOS)
+                        image = image.resize((120, 120), Image.Resampling.LANCZOS)
                         photo = ImageTk.PhotoImage(image)
                         profile_label.config(image=photo)
                         profile_label.image = photo  # Keep a reference
@@ -481,12 +481,12 @@ def fetch_current_task():
 def greet_user():
     current_hour = datetime.now().hour
     if current_hour < 12:
-        greeting = "Good morning"
+        greeting = "Good Morning,"
     elif 12 <= current_hour < 16:
-        greeting = "Good afternoon"
+        greeting = "Good Afternoon,"
     else:
-        greeting = "Good evening"
-    # Two-line greeting: greeting on first line, name on second
+        greeting = "Good Evening,"
+    # Two-line greeting: greeting with comma on first line, name on second
     greeting_label.config(text=f"{greeting}\n{user_name}")
 
 def emergency_pressed():
@@ -1215,6 +1215,13 @@ def cleanup_temp_files():
             logging.error(f"Failed to delete temp file {temp_file}: {e}")
 
 def setup_realtime_listeners():
+    # Listen for GUI profile changes
+    def on_gui_profile_snapshot(doc_snapshot, changes, read_time):
+        for doc in doc_snapshot:
+            if doc.exists:
+                gui_data = doc.to_dict()
+                update_gui_profile(gui_data)
+
     # Listen for task changes
     def on_task_snapshot(doc_snapshot, changes, read_time):
         for doc in doc_snapshot:
@@ -1229,12 +1236,52 @@ def setup_realtime_listeners():
                 recording_data = doc.to_dict()
                 update_recordings()
 
-    # Only set up listeners for tasks and recordings (not user profile)
+    # Set up the listeners
+    gui_profile_ref = db.collection('system_status').document('gui_profile')
+    gui_profile_ref.on_snapshot(on_gui_profile_snapshot)
+
     tasks_ref = db.collection('tasks')
     tasks_ref.on_snapshot(on_task_snapshot)
 
     recordings_ref = db.collection('recordings')
     recordings_ref.on_snapshot(on_recording_snapshot)
+
+def update_gui_profile(gui_data):
+    """Update GUI profile in real-time when changes are made in the app"""
+    global user_name, user_profile_pic_url
+    try:
+        new_name = gui_data.get('name', 'GUI Bot')
+        new_profile_pic_url = gui_data.get('profileImageUrl')
+        
+        # Update name if changed
+        if new_name != user_name:
+            user_name = new_name
+            greet_user()
+        
+        # Update profile picture if changed
+        if new_profile_pic_url != user_profile_pic_url:
+            user_profile_pic_url = new_profile_pic_url
+            if user_profile_pic_url and 'profile_label' in globals():
+                try:
+                    response = requests.get(user_profile_pic_url)
+                    if response.status_code == 200:
+                        image_data = response.content
+                        image = Image.open(io.BytesIO(image_data))
+                        image = image.resize((120, 120), Image.Resampling.LANCZOS)
+                        photo = ImageTk.PhotoImage(image)
+                        profile_label.config(image=photo)
+                        profile_label.image = photo
+                    else:
+                        logging.error(f"Failed to download profile image. Status code: {response.status_code}")
+                        profile_label.config(text="No Profile Picture")
+                except Exception as e:
+                    logging.error(f"Error loading profile picture: {e}")
+                    profile_label.config(text="No Profile Picture")
+            elif not user_profile_pic_url:
+                profile_label.config(text="No Profile Picture")
+                
+    except Exception as e:
+        logging.error(f"Error updating GUI profile: {e}")
 
 def update_task(task_data):
     global current_task, task_sent_time, task_due_time
@@ -1684,7 +1731,7 @@ left_col.grid_propagate(True)
 # Profile & Greeting
 profile_frame = tk.Frame(left_col, bg=STANDARD_BG)
 profile_frame.pack(pady=5)
-profile_label = tk.Label(profile_frame, bg=STANDARD_BG, width=80, height=80)
+profile_label = tk.Label(profile_frame, bg=STANDARD_BG, width=100, height=100)
 profile_label.pack()
 # Add more vertical space
 profile_frame_spacer = tk.Label(left_col, text="", bg=STANDARD_BG, height=1)
