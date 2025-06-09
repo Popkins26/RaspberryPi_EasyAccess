@@ -1759,17 +1759,17 @@ right_col.grid_columnconfigure(0, weight=1)
 
 # Camera controls (top)
 camera_row = tk.Frame(right_col, bg=STANDARD_BG)
-camera_row.grid(row=0, column=0, pady=8, sticky='ew')
+camera_row.grid(row=0, column=0, pady=(2, 2), sticky='ew')  # Tighter vertical padding
 camera_row.grid_columnconfigure(0, weight=1)
 camera_row.grid_columnconfigure(1, weight=1)
 camera_btn = create_small_button(camera_row, "Open Camera View", show_camera, BUTTON_BG, width=16)
-camera_btn.grid(row=0, column=0, padx=6, pady=8, sticky='e')
+camera_btn.grid(row=0, column=0, padx=4, pady=4, sticky='e')  # Tighter padding
 record_voice_btn = create_small_button(camera_row, "Record Voice", toggle_record_voice, BUTTON_BG, width=16)
-record_voice_btn.grid(row=0, column=1, padx=6, pady=8, sticky='w')
+record_voice_btn.grid(row=0, column=1, padx=4, pady=4, sticky='w')
 
 # Task Display (right column, above recordings)
 task_frame = tk.Frame(right_col, bg=STANDARD_BG)
-task_frame.grid(row=1, column=0, pady=(2, 6), sticky='ew')  # Reduced top and bottom padding
+task_frame.grid(row=1, column=0, pady=(2, 2), sticky='ew')  # Tighter vertical padding
 task_display = tk.Label(
     task_frame, 
     text="Loading task...", 
@@ -1783,28 +1783,28 @@ task_display = tk.Label(
     width=40, 
     height=4
 )
-task_display.pack(padx=8, pady=6, fill='x', expand=True)  # Reduced vertical padding
+task_display.pack(padx=6, pady=4, fill='x', expand=True)  # Tighter padding
 
 # Task buttons (below task window)
 task_btns = tk.Frame(task_frame, bg=STANDARD_BG)
-task_btns.pack(pady=5)
+task_btns.pack(pady=2)  # Tighter padding
 task_done_btn = create_small_button(task_btns, "Task Done", task_done, "#27AE60", width=12)
-task_done_btn.pack(side='left', padx=3, fill='x', expand=True)
+task_done_btn.pack(side='left', padx=2, fill='x', expand=True)
 snooze_btn = create_small_button(task_btns, "Snooze", snooze_task, "#F39C12", fg_color="#222", width=12)
-snooze_btn.pack(side='left', padx=3, fill='x', expand=True)
+snooze_btn.pack(side='left', padx=2, fill='x', expand=True)
 
 # Recordings controls (bottom right, larger and scrollable)
 media_row = tk.Frame(right_col, bg=STANDARD_BG)
-media_row.grid(row=2, column=0, padx=8, pady=(2, 8), sticky='nsew')
+media_row.grid(row=2, column=0, padx=6, pady=(2, 4), sticky='nsew')  # Tighter padding
 media_row.grid_rowconfigure(0, weight=1)
 media_row.grid_columnconfigure(0, weight=1)
 recordings_label = tk.Label(media_row, text="Recordings", font=("DejaVu Sans", 14, "bold"), bg=STANDARD_BG, fg="#2C3E50")
-recordings_label.grid(row=0, column=0, pady=(0, 8), sticky='w')
+recordings_label.grid(row=0, column=0, pady=(0, 4), sticky='w')  # Tighter padding
 media_listbox = tk.Listbox(
     media_row, 
     font=("DejaVu Sans", 11), 
     width=60, 
-    height=8,  # Reduced height for more space for buttons
+    height=8,  # Keep as 8 for now
     bg="white", 
     fg="#2C3E50", 
     selectbackground=BUTTON_BG, 
@@ -1812,9 +1812,9 @@ media_listbox = tk.Listbox(
     relief="sunken", 
     borderwidth=2
 )
-media_listbox.grid(row=1, column=0, padx=8, pady=4, sticky='nsew')  # Reduced vertical padding
+media_listbox.grid(row=1, column=0, padx=6, pady=2, sticky='nsew')  # Tighter padding
 media_btns = tk.Frame(media_row, bg=STANDARD_BG)
-media_btns.grid(row=2, column=0, columnspan=2, pady=(10, 2), sticky='ew')  # More space above buttons
+media_btns.grid(row=2, column=0, columnspan=2, pady=(4, 2), sticky='ew')  # Tighter padding
 play_btn = create_small_button(media_btns, "Play", lambda: play_recording(get_selected_recording()), BUTTON_BG, width=8)
 play_btn.pack(side='left', padx=2, fill='x', expand=True)
 pause_btn = create_small_button(media_btns, "Pause", pause_recording, BUTTON_BG, width=8)
