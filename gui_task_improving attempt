@@ -1721,7 +1721,7 @@ content_frame.grid_rowconfigure(0, weight=1)
 content_frame.grid_columnconfigure(0, weight=1, minsize=300)  # Left: profile, task, buttons
 content_frame.grid_columnconfigure(1, weight=2, minsize=600)  # Right: camera, recordings
 
-# --- LEFT COLUMN: Profile, Task, Exit, Shutdown ---
+# --- LEFT COLUMN: Profile, Emergency, Exit, Shutdown ---
 left_col = tk.Frame(content_frame, bg=STANDARD_BG)
 left_col.grid(row=0, column=0, sticky='ns', padx=(0, 20), pady=0)
 left_col.grid_propagate(True)
@@ -1734,50 +1734,21 @@ profile_label.pack()
 greeting_label = tk.Label(left_col, text="", bg=STANDARD_BG, fg="#2C3E50", font=("DejaVu Sans", 12))
 greeting_label.pack(pady=2)
 
-# Task Display (bigger, takes most of the space)
-task_frame = tk.Frame(left_col, bg=STANDARD_BG)
-task_frame.pack(pady=10, fill='both', expand=True)
+# Emergency button (stacked)
+emergency_btn = create_small_button(left_col, "EMERGENCY", emergency_pressed, "#E74C3C", width=18)
+emergency_btn.pack(pady=15, fill='x', expand=True)
 
-task_display = tk.Label(
-    task_frame, 
-    text="Loading task...", 
-    font=("DejaVu Sans", 14), 
-    bg="white", 
-    fg="#2C3E50", 
-    wraplength=280,
-    justify="center", 
-    relief="sunken", 
-    borderwidth=2, 
-    width=35,
-    height=8   # Made much bigger
-)
-task_display.pack(padx=8, pady=8, fill='both', expand=True)
+# Exit GUI and Shutdown (stacked)
+exit_btn = create_small_button(left_col, "Exit GUI", on_closing, "#34495E", width=18)
+exit_btn.pack(pady=5, fill='x', expand=True)
+shutdown_btn = create_small_button(left_col, "Shutdown", shutdown_pi, "#555555", width=18)
+shutdown_btn.pack(pady=5, fill='x', expand=True)
 
-# Task buttons at the very bottom
-task_btns = tk.Frame(task_frame, bg=STANDARD_BG)
-task_btns.pack(side='bottom', pady=5, fill='x')
-
-# Task Done and Snooze buttons
-task_action_frame = tk.Frame(task_btns, bg=STANDARD_BG)
-task_action_frame.pack(fill='x')
-task_done_btn = create_small_button(task_action_frame, "Task Done", task_done, "#27AE60", width=12)
-task_done_btn.pack(side='left', padx=3, fill='x', expand=True)
-snooze_btn = create_small_button(task_action_frame, "Snooze", snooze_task, "#F39C12", fg_color="#222", width=12)
-snooze_btn.pack(side='left', padx=3, fill='x', expand=True)
-
-# Exit GUI and Shutdown buttons below task buttons
-exit_shutdown_frame = tk.Frame(task_btns, bg=STANDARD_BG)
-exit_shutdown_frame.pack(fill='x', pady=(5, 0))
-exit_btn = create_small_button(exit_shutdown_frame, "Exit GUI", on_closing, "#34495E", width=12)
-exit_btn.pack(side='left', padx=3, fill='x', expand=True)
-shutdown_btn = create_small_button(exit_shutdown_frame, "Shutdown", shutdown_pi, "#555555", width=12)
-shutdown_btn.pack(side='left', padx=3, fill='x', expand=True)
-
-# --- RIGHT COLUMN: Camera, Emergency, Recordings ---
+# --- RIGHT COLUMN: Camera, Task, Recordings ---
 right_col = tk.Frame(content_frame, bg=STANDARD_BG)
 right_col.grid(row=0, column=1, sticky='nsew')
 right_col.grid_rowconfigure(0, weight=0)  # Camera controls
-right_col.grid_rowconfigure(1, weight=0)  # Emergency button
+right_col.grid_rowconfigure(1, weight=0)  # Task window
 right_col.grid_rowconfigure(2, weight=1)  # Recordings
 right_col.grid_columnconfigure(0, weight=1)
 
@@ -1791,39 +1762,44 @@ camera_btn.grid(row=0, column=0, padx=6, pady=8, sticky='e')
 record_voice_btn = create_small_button(camera_row, "Record Voice", toggle_record_voice, BUTTON_BG, width=16)
 record_voice_btn.grid(row=0, column=1, padx=6, pady=8, sticky='w')
 
-# Emergency button (big, spans full width)
-emergency_frame = tk.Frame(right_col, bg=STANDARD_BG)
-emergency_frame.grid(row=1, column=0, pady=8, sticky='ew')
-emergency_btn = tk.Button(
-    emergency_frame,
-    text="EMERGENCY",
-    command=emergency_pressed,
-    bg="#E74C3C",
-    fg="white",
-    font=("DejaVu Sans", 18, "bold"),
-    height=2,
-    relief="raised",
-    borderwidth=3,
-    activebackground="#C0392B",
-    activeforeground="white"
+# Task Display (right column, above recordings)
+task_frame = tk.Frame(right_col, bg=STANDARD_BG)
+task_frame.grid(row=1, column=0, pady=10, sticky='ew')
+task_display = tk.Label(
+    task_frame, 
+    text="Loading task...", 
+    font=("DejaVu Sans", 14), 
+    bg="white", 
+    fg="#2C3E50", 
+    wraplength=400, 
+    justify="center", 
+    relief="sunken", 
+    borderwidth=2, 
+    width=40, 
+    height=4
 )
-emergency_btn.pack(fill='x', padx=8)
+task_display.pack(padx=8, pady=8, fill='x', expand=True)
 
-# Recordings controls (smaller but still scrollable)
+# Task buttons (below task window)
+task_btns = tk.Frame(task_frame, bg=STANDARD_BG)
+task_btns.pack(pady=5)
+task_done_btn = create_small_button(task_btns, "Task Done", task_done, "#27AE60", width=12)
+task_done_btn.pack(side='left', padx=3, fill='x', expand=True)
+snooze_btn = create_small_button(task_btns, "Snooze", snooze_task, "#F39C12", fg_color="#222", width=12)
+snooze_btn.pack(side='left', padx=3, fill='x', expand=True)
+
+# Recordings controls (bottom right, larger and scrollable)
 media_row = tk.Frame(right_col, bg=STANDARD_BG)
 media_row.grid(row=2, column=0, padx=8, pady=8, sticky='nsew')
 media_row.grid_rowconfigure(0, weight=1)
 media_row.grid_columnconfigure(0, weight=1)
-
-# Add a label for recordings
 recordings_label = tk.Label(media_row, text="Recordings", font=("DejaVu Sans", 14, "bold"), bg=STANDARD_BG, fg="#2C3E50")
 recordings_label.grid(row=0, column=0, pady=(0, 8), sticky='w')
-
 media_listbox = tk.Listbox(
     media_row, 
     font=("DejaVu Sans", 11), 
-    width=45, 
-    height=8,  # Made smaller
+    width=60, 
+    height=12,  # Larger
     bg="white", 
     fg="#2C3E50", 
     selectbackground=BUTTON_BG, 
@@ -1832,12 +1808,9 @@ media_listbox = tk.Listbox(
     borderwidth=2
 )
 media_listbox.grid(row=1, column=0, padx=8, pady=8, sticky='nsew')
-
-# Add scrollbar for recordings
 scrollbar = tk.Scrollbar(media_row, orient="vertical", command=media_listbox.yview)
 scrollbar.grid(row=1, column=1, sticky='ns')
 media_listbox.configure(yscrollcommand=scrollbar.set)
-
 media_btns = tk.Frame(media_row, bg=STANDARD_BG)
 media_btns.grid(row=2, column=0, columnspan=2, pady=2, sticky='ew')
 play_btn = create_small_button(media_btns, "Play", lambda: play_recording(get_selected_recording()), BUTTON_BG, width=8)
