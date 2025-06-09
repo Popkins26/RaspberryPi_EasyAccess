@@ -881,12 +881,31 @@ def show_snooze_notification(task_name):
     # Fetch the task again to make it visible
     fetch_current_task()
 
+def on_closing():
+    """Show confirmation dialog before exiting"""
+    result = messagebox.askyesno("Exit GUI", "Are you sure you want to exit?")
+    if result:
+        try:
+            # Stop task checker
+            stop_task_checker()
+            # Stop Pi status monitor
+            stop_pi_status_monitor()
+            # Send offline status
+            send_offline_status()
+            # Clean up temporary files
+            cleanup_temp_files()
+            # Destroy the window
+            root.destroy()
+        except Exception as e:
+            logging.error(f"Error during shutdown: {e}")
+            root.destroy()
+
 def open_task_scheduler():
     pass  # Removed task adding functionality
 
 def fetch_recordings():
     try:
-        # Get recordings from Firebase Storage (only from recordings folder)
+        # Get recordings from Firebase Storage (only from recordings folder, not voice_notes)
         recordings_ref = bucket.list_blobs(prefix='recordings/')
         
         recordings_list = []
@@ -895,7 +914,7 @@ def fetch_recordings():
             if not blob.name.endswith('/'):
                 # Get the public URL
                 blob.make_public()
-            recordings_list.append({
+                recordings_list.append({
                     'id': blob.name,
                     'name': os.path.basename(blob.name),
                     'url': blob.public_url,
@@ -1290,6 +1309,8 @@ def update_recordings():
         media_listbox.delete(0, tk.END)
         if recordings:
             for recording in recordings:
+                # Only show recordings that are not associated with tasks
+                # Task recordings are stored in voice_notes/ folder, these are in recordings/ folder
                 media_listbox.insert(tk.END, recording['name'])
         else:
             media_listbox.insert(tk.END, "No recordings available.")
@@ -1839,26 +1860,6 @@ update_media_player()
 setup_realtime_listeners()
 start_task_checker()
 start_pi_status_monitor()  # Start Pi status monitoring
-
-# Update the cleanup on window close
-def on_closing():
-    """Show confirmation dialog before exiting"""
-    result = messagebox.askyesno("Exit GUI", "Are you sure you want to exit?")
-    if result:
-        try:
-            # Stop task checker
-            stop_task_checker()
-            # Stop Pi status monitor
-            stop_pi_status_monitor()
-            # Send offline status
-            send_offline_status()
-            # Clean up temporary files
-            cleanup_temp_files()
-            # Destroy the window
-            root.destroy()
-        except Exception as e:
-            logging.error(f"Error during shutdown: {e}")
-            root.destroy()
 
 root.protocol("WM_DELETE_WINDOW", on_closing)
 
