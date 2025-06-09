@@ -401,22 +401,15 @@ def show_camera():
 def fetch_user_data():
     global user_name, user_profile_pic_url
     try:
-        # Get the specific user document using the ID from the screenshot
-        user_doc = db.collection('users').document('3Vh88LDtQCeWWwMqCoOM01iqRKA3').get()
-        
-        if user_doc.exists:
-            user_data = user_doc.to_dict()
-            user_name = user_data.get('name', 'User')
-            user_profile_pic_url = user_data.get('profileImageUrl')
-            
-            logging.debug(f"Fetched user data - Name: {user_name}")
-            logging.debug(f"Profile URL: {user_profile_pic_url}")
-            
-            # Update the greeting label immediately if it exists
+        # Fetch from system_status/gui_profile instead of users collection
+        doc = db.collection('system_status').document('gui_profile').get()
+        if doc.exists:
+            data = doc.to_dict()
+            user_name = data.get('name', 'GUI Bot')
+            user_profile_pic_url = data.get('profileImageUrl')
+            # Update the greeting label and profile picture
             if 'greeting_label' in globals():
                 greet_user()
-                
-            # Update profile picture if URL exists
             if user_profile_pic_url and 'profile_label' in globals():
                 try:
                     response = requests.get(user_profile_pic_url)
@@ -433,12 +426,11 @@ def fetch_user_data():
                     logging.error(f"Error loading profile picture: {e}")
                     profile_label.config(text="No Profile Picture")
         else:
-            logging.error("User document not found")
-            messagebox.showerror("Error", "User not found in database")
-            
+            logging.error("GUI profile document not found")
+            messagebox.showerror("Error", "GUI profile not found in database")
     except Exception as e:
-        logging.error(f"Error fetching user data: {e}")
-        messagebox.showerror("Error", f"Failed to fetch user data: {e}")
+        logging.error(f"Error fetching GUI profile data: {e}")
+        messagebox.showerror("Error", f"Failed to fetch GUI profile data: {e}")
 
 def fetch_current_task():
     global current_task, task_sent_time, task_due_time
@@ -1731,8 +1723,11 @@ profile_frame = tk.Frame(left_col, bg=STANDARD_BG)
 profile_frame.pack(pady=5)
 profile_label = tk.Label(profile_frame, bg=STANDARD_BG, width=80, height=80)
 profile_label.pack()
-greeting_label = tk.Label(left_col, text="", bg=STANDARD_BG, fg="#2C3E50", font=("DejaVu Sans", 12))
-greeting_label.pack(pady=2)
+# Add more vertical space
+profile_frame_spacer = tk.Label(left_col, text="", bg=STANDARD_BG, height=1)
+profile_frame_spacer.pack()
+greeting_label = tk.Label(left_col, text="", bg=STANDARD_BG, fg="#2C3E50", font=("DejaVu Sans", 18, "bold"))
+greeting_label.pack(pady=8)
 
 # Emergency button (stacked)
 emergency_btn = create_small_button(left_col, "EMERGENCY", emergency_pressed, "#E74C3C", width=18)
@@ -1808,9 +1803,6 @@ media_listbox = tk.Listbox(
     borderwidth=2
 )
 media_listbox.grid(row=1, column=0, padx=8, pady=8, sticky='nsew')
-scrollbar = tk.Scrollbar(media_row, orient="vertical", command=media_listbox.yview)
-scrollbar.grid(row=1, column=1, sticky='ns')
-media_listbox.configure(yscrollcommand=scrollbar.set)
 media_btns = tk.Frame(media_row, bg=STANDARD_BG)
 media_btns.grid(row=2, column=0, columnspan=2, pady=2, sticky='ew')
 play_btn = create_small_button(media_btns, "Play", lambda: play_recording(get_selected_recording()), BUTTON_BG, width=8)
