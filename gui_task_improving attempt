@@ -466,10 +466,10 @@ def fetch_current_task():
                     task_found = True
                     
                     if current_task:
-                        task_text = f"Task: {current_task}\nScheduled: {scheduled_time.strftime('%Y-%m-%d %H:%M')}"
+                        task_text = f"Task: {current_task}\nTime: {scheduled_time.strftime('%H:%M')} on {scheduled_time.strftime('%Y-%m-%d')}"
                         if task_due_time:
                             due_time = datetime.fromtimestamp(task_due_time / 1000)
-                            task_text += f"\nDue: {due_time.strftime('%Y-%m-%d %H:%M')}"
+                            task_text += f"\nDue: {due_time.strftime('%H:%M')} on {due_time.strftime('%Y-%m-%d')}"
                         task_display.config(text=task_text)
                     else:
                         task_display.config(text="No current task.")
@@ -747,6 +747,7 @@ def snooze_task():
         try:
             # Show snooze options dialog
             snooze_options = {
+                "2 minutes": 2,
                 "5 minutes": 5,
                 "10 minutes": 10,
                 "15 minutes": 15
@@ -755,8 +756,9 @@ def snooze_task():
             # Create a simple dialog for snooze selection
             snooze_window = tk.Toplevel(root)
             snooze_window.title("Snooze Task")
-            snooze_window.geometry("300x200")
+            snooze_window.geometry("350x280")
             snooze_window.attributes('-topmost', True)
+            snooze_window.resizable(False, False)
             
             # Center the window
             snooze_window.update_idletasks()
@@ -767,8 +769,11 @@ def snooze_task():
             snooze_window.geometry(f'{width}x{height}+{x}+{y}')
             
             # Add title
-            title_label = tk.Label(snooze_window, text="Snooze for:", font=("DejaVu Sans", 14, "bold"))
+            title_label = tk.Label(snooze_window, text="Snooze Task", font=("DejaVu Sans", 16, "bold"))
             title_label.pack(pady=20)
+            
+            subtitle_label = tk.Label(snooze_window, text="Select snooze duration:", font=("DejaVu Sans", 12))
+            subtitle_label.pack(pady=5)
             
             selected_minutes = tk.IntVar(value=5)
             
@@ -777,15 +782,20 @@ def snooze_task():
                 snooze_window.destroy()
                 _apply_snooze(minutes)
             
+            def cancel_snooze():
+                snooze_window.destroy()
+            
             # Add radio buttons for snooze options
             for text, minutes in snooze_options.items():
                 tk.Radiobutton(
                     snooze_window,
                     text=text,
-                    variable=selected_minutes,
+                    variable= selected_minutes,
                     value=minutes,
-                    font=("DejaVu Sans", 12)
-                ).pack(pady=5)
+                    font=("DejaVu Sans", 12),
+                    anchor='w',
+                    padx=20
+                ).pack(pady=3, fill='x')
             
             # Add buttons
             button_frame = tk.Frame(snooze_window)
@@ -794,15 +804,19 @@ def snooze_task():
             tk.Button(
                 button_frame,
                 text="Cancel",
-                command=snooze_window.destroy,
-                font=("DejaVu Sans", 12)
+                command=cancel_snooze,
+                font=("DejaVu Sans", 12),
+                width=10,
+                bg="#E74C3C",
+                fg="white"
             ).pack(side='left', padx=10)
             
             tk.Button(
                 button_frame,
-                text="Snooze",
+                text="OK",
                 command=apply_snooze,
                 font=("DejaVu Sans", 12),
+                width=10,
                 bg="#4A90E2",
                 fg="white"
             ).pack(side='left', padx=10)
@@ -846,10 +860,10 @@ def _apply_snooze(minutes):
         task_text = f"Task: {current_task}\nSnoozed until: {snooze_time.strftime('%H:%M')}"
         if task_due_time:
             due_time = datetime.fromtimestamp(task_due_time / 1000)
-            task_text += f"\nDue: {due_time.strftime('%Y-%m-%d %H:%M')}"
+            task_text += f"\nDue: {due_time.strftime('%H:%M')} on {due_time.strftime('%Y-%m-%d')}"
         task_display.config(text=task_text)
         
-        # Set timer for notification
+        # Set timer for notification and task visibility
         snooze_timer = threading.Timer(minutes * 60, lambda: show_snooze_notification(current_task))
         snooze_timer.daemon = True
         snooze_timer.start()
@@ -861,7 +875,10 @@ def _apply_snooze(minutes):
         messagebox.showerror("Error", f"Failed to snooze task: {e}")
 
 def show_snooze_notification(task_name):
+    """Show notification when snooze time is over and make task visible again"""
     messagebox.showinfo("Task Reminder", f"Your snoozed task '{task_name}' is due now!")
+    # Fetch the task again to make it visible
+    fetch_current_task()
 
 def open_task_scheduler():
     pass  # Removed task adding functionality
@@ -1652,8 +1669,8 @@ def firestore_listener_thread():
 # Create the main window and UI elements
 root = tk.Tk()
 root.title("Care Taker Bot")
-root.geometry("1000x800")
-root.minsize(800, 480)  # Minimum size for 7-inch display
+root.geometry("1200x900")  # Made window bigger
+root.minsize(1000, 600)  # Increased minimum size
 root.configure(bg=STANDARD_BG)
 root.resizable(True, True)
 
@@ -1675,14 +1692,14 @@ temp_label.pack(anchor='e')
 
 update_clock()
 
-# --- MAIN CONTENT FRAME (TWO COLUMNS, FLIPPED) ---
+# --- MAIN CONTENT FRAME (TWO COLUMNS) ---
 content_frame = tk.Frame(root, bg=STANDARD_BG)
 content_frame.pack(fill='both', expand=True, padx=20, pady=10)
 content_frame.grid_rowconfigure(0, weight=1)
-content_frame.grid_columnconfigure(0, weight=1, minsize=250)  # Left: buttons
-content_frame.grid_columnconfigure(1, weight=3, minsize=500)  # Right: interactive sections
+content_frame.grid_columnconfigure(0, weight=1, minsize=300)  # Left: profile, task, buttons
+content_frame.grid_columnconfigure(1, weight=2, minsize=600)  # Right: camera, recordings
 
-# --- LEFT COLUMN: Profile, Emergency, Exit, Shutdown ---
+# --- LEFT COLUMN: Profile, Task, Emergency, Exit, Shutdown ---
 left_col = tk.Frame(content_frame, bg=STANDARD_BG)
 left_col.grid(row=0, column=0, sticky='ns', padx=(0, 20), pady=0)
 left_col.grid_propagate(True)
@@ -1695,6 +1712,33 @@ profile_label.pack()
 greeting_label = tk.Label(left_col, text="", bg=STANDARD_BG, fg="#2C3E50", font=("DejaVu Sans", 12))
 greeting_label.pack(pady=2)
 
+# Task Display (moved from right to left)
+task_frame = tk.Frame(left_col, bg=STANDARD_BG)
+task_frame.pack(pady=10, fill='x', expand=True)
+
+task_display = tk.Label(
+    task_frame, 
+    text="Loading task...", 
+    font=("DejaVu Sans", 12), 
+    bg="white", 
+    fg="#2C3E50", 
+    wraplength=280,  # Increased width
+    justify="center", 
+    relief="sunken", 
+    borderwidth=2, 
+    width=35,  # Increased width
+    height=4   # Increased height
+)
+task_display.pack(padx=8, pady=8, fill='x', expand=True)
+
+# Task buttons
+task_btns = tk.Frame(task_frame, bg=STANDARD_BG)
+task_btns.pack(pady=5)
+task_done_btn = create_small_button(task_btns, "Task Done", task_done, "#27AE60", width=12)
+task_done_btn.pack(side='left', padx=3, fill='x', expand=True)
+snooze_btn = create_small_button(task_btns, "Snooze", snooze_task, "#F39C12", fg_color="#222", width=12)
+snooze_btn.pack(side='left', padx=3, fill='x', expand=True)
+
 # Emergency button (centered)
 emergency_btn = create_small_button(left_col, "EMERGENCY", emergency_pressed, "#E74C3C", width=18)
 emergency_btn.pack(pady=15, fill='x', expand=True)
@@ -1705,12 +1749,11 @@ exit_btn.pack(pady=5, fill='x', expand=True)
 shutdown_btn = create_small_button(left_col, "Shutdown", shutdown_pi, "#555555", width=18)
 shutdown_btn.pack(pady=5, fill='x', expand=True)
 
-# --- RIGHT COLUMN: Camera, Task, Recordings (NO SECTION TITLES) ---
+# --- RIGHT COLUMN: Camera, Recordings ---
 right_col = tk.Frame(content_frame, bg=STANDARD_BG)
 right_col.grid(row=0, column=1, sticky='nsew')
 right_col.grid_rowconfigure(0, weight=0)
-right_col.grid_rowconfigure(1, weight=0)
-right_col.grid_rowconfigure(2, weight=1)
+right_col.grid_rowconfigure(1, weight=1)
 right_col.grid_columnconfigure(0, weight=1)
 
 # Camera controls (centered)
@@ -1723,25 +1766,12 @@ camera_btn.grid(row=0, column=0, padx=6, pady=8, sticky='e')
 record_voice_btn = create_small_button(camera_row, "Record Voice", toggle_record_voice, BUTTON_BG, width=16)
 record_voice_btn.grid(row=0, column=1, padx=6, pady=8, sticky='w')
 
-# Task controls (centered)
-task_row = tk.Frame(right_col, bg=STANDARD_BG)
-task_row.grid(row=1, column=0, pady=8, sticky='ew')
-task_row.grid_columnconfigure(0, weight=1)
-task_display = tk.Label(task_row, text="Loading task...", font=("DejaVu Sans", 12), bg="white", fg="#2C3E50", wraplength=400, justify="center", relief="sunken", borderwidth=2, width=32, height=2)
-task_display.pack(padx=8, pady=8, fill='x', expand=True)
-task_btns = tk.Frame(task_row, bg=STANDARD_BG)
-task_btns.pack(pady=2)
-task_done_btn = create_small_button(task_btns, "Task Done", task_done, "#27AE60", width=10)
-task_done_btn.pack(side='left', padx=3, fill='x', expand=True)
-snooze_btn = create_small_button(task_btns, "Snooze", snooze_task, "#F39C12", fg_color="#222", width=10)
-snooze_btn.pack(side='left', padx=3, fill='x', expand=True)
-
 # Recordings controls (taller, scalable)
 media_row = tk.Frame(right_col, bg=STANDARD_BG)
-media_row.grid(row=2, column=0, padx=8, pady=8, sticky='nsew')
+media_row.grid(row=1, column=0, padx=8, pady=8, sticky='nsew')
 media_row.grid_rowconfigure(0, weight=1)
 media_row.grid_columnconfigure(0, weight=1)
-media_listbox = tk.Listbox(media_row, font=("DejaVu Sans", 12), width=40, height=7, bg="white", fg="#2C3E50", selectbackground=BUTTON_BG, selectforeground="white", relief="sunken", borderwidth=2)
+media_listbox = tk.Listbox(media_row, font=("DejaVu Sans", 12), width=50, height=10, bg="white", fg="#2C3E50", selectbackground=BUTTON_BG, selectforeground="white", relief="sunken", borderwidth=2)
 media_listbox.grid(row=0, column=0, padx=8, pady=8, sticky='nsew')
 media_btns = tk.Frame(media_row, bg=STANDARD_BG)
 media_btns.grid(row=1, column=0, pady=2, sticky='ew')
