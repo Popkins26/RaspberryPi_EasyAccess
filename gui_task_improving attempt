@@ -564,10 +564,12 @@ def play_and_handle_recording(audio_url, task_doc, task_id):
                 wav_path = convert_mp3_to_wav(temp_path)
                 pygame.mixer.music.load(wav_path)
                 pygame.mixer.music.play()
-                while pygame.mixer.music.get_busy():
+                # Wait for playback to finish, but also ensure a minimum duration
+                min_duration = 1.0  # seconds
+                start_time = _time.time()
+                while pygame.mixer.music.get_busy() or (_time.time() - start_time < min_duration):
                     pygame.time.Clock().tick(10)
-                # Add a small delay to ensure playback buffer is flushed
-                _time.sleep(0.5)
+                pygame.mixer.music.unload()  # Release the file
                 os.remove(wav_path)
                 played = True
             except Exception as e:
@@ -586,11 +588,12 @@ def play_and_handle_recording(audio_url, task_doc, task_id):
                         wav_path = convert_mp3_to_wav(temp_path)
                         pygame.mixer.music.load(wav_path)
                         pygame.mixer.music.play()
-                        while pygame.mixer.music.get_busy():
+                        # Wait for playback to finish, but also ensure a minimum duration
+                        min_duration = 1.0  # seconds
+                        start_time = _time.time()
+                        while pygame.mixer.music.get_busy() or (_time.time() - start_time < min_duration):
                             pygame.time.Clock().tick(10)
-                        # Add a small delay to ensure playback buffer is flushed
-                        _time.sleep(0.5)
-                        os.remove(temp_path)
+                        pygame.mixer.music.unload()  # Release the file
                         os.remove(wav_path)
                         played = True
                         break
