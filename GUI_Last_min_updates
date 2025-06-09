@@ -1364,7 +1364,31 @@ camera_preview = CameraPreviewWindow()
 def update_clock():
     current_time = datetime.now().strftime("%H:%M")
     clock_label.config(text=current_time)
+    
+    # Update temperature display
+    update_temperature_display()
+    
     root.after(1000, update_clock)  # Still update every second for accuracy
+
+def update_temperature_display():
+    """Update the temperature display"""
+    try:
+        temperature = get_cpu_temperature()
+        if temperature is not None:
+            # Color code based on temperature
+            if temperature >= 80:
+                color = "#FF4444"  # Red for high temperature
+            elif temperature >= 70:
+                color = "#FF8800"  # Orange for warning temperature
+            else:
+                color = "#44AA44"  # Green for normal temperature
+            
+            temp_label.config(text=f"CPU: {temperature:.1f}°C", fg=color)
+        else:
+            temp_label.config(text="CPU: --°C", fg="#888888")
+    except Exception as e:
+        logger.error(f"Error updating temperature display: {e}")
+        temp_label.config(text="CPU: --°C", fg="#888888")
 
 def toggle_record_voice():
     """Toggle voice recording on/off (user controlled duration)"""
@@ -1550,8 +1574,17 @@ title_frame = tk.Frame(root, bg=STANDARD_BG)
 title_frame.pack(fill='x', pady=(10, 0))
 title_label = tk.Label(title_frame, text="CARE TAKER BOT", font=("DejaVu Sans", 32, "bold"), bg=STANDARD_BG, fg="#2C3E50")
 title_label.pack(side='left', padx=(20, 0), anchor='w')
-clock_label = tk.Label(title_frame, font=("DejaVu Sans Mono", 24), bg=STANDARD_BG, fg="#2C3E50")
-clock_label.pack(side='right', padx=(0, 20), anchor='e')
+
+# Clock and temperature frame (right side)
+clock_temp_frame = tk.Frame(title_frame, bg=STANDARD_BG)
+clock_temp_frame.pack(side='right', padx=(0, 20), anchor='e')
+
+clock_label = tk.Label(clock_temp_frame, font=("DejaVu Sans Mono", 24), bg=STANDARD_BG, fg="#2C3E50")
+clock_label.pack(anchor='e')
+
+temp_label = tk.Label(clock_temp_frame, font=("DejaVu Sans", 10), bg=STANDARD_BG, fg="#44AA44")
+temp_label.pack(anchor='e')
+
 update_clock()
 
 # --- MAIN CONTENT FRAME (TWO COLUMNS, FLIPPED) ---
