@@ -64,6 +64,7 @@ current_task = None
 task_sent_time = None
 task_due_time = None
 previous_task_state = None  # Store previous task when audio task takes over
+audio_prefetch_cache = {}  # {task_id: local_file_path}
 temp_files = []  # List to store temporary files
 current_audio_position = 0  # Track current audio position for resume functionality
 snooze_timer = None  # Timer for snooze functionality
@@ -434,7 +435,7 @@ def fetch_user_data():
         messagebox.showerror("Error", f"Failed to fetch GUI profile data: {e}")
 
 def fetch_current_task():
-    global current_task, task_sent_time, task_due_time, previous_task_state
+    global current_task, task_sent_time, task_due_time, previous_task_state, audio_prefetch_cache
     try:
         tasks_ref = db.collection('tasks')
         tasks = tasks_ref.order_by('scheduledTime', direction=firestore.Query.DESCENDING).get()
@@ -447,9 +448,12 @@ def fetch_current_task():
             if not task_data.get('isCompleted', False):
                 scheduled_time = datetime.fromtimestamp(task_data.get('scheduledTime', 0) / 1000)
                 time_diff = (current_time - scheduled_time).total_seconds()
-                
-                # If task has a recording, check if it's exactly time (within 10 seconds)
+                task_id = task_doc.id
+                # Prefetch audio 20 seconds before scheduled time
                 if 'recordingUrl' in task_data:
+                    if -20 <= time_diff < -10:  # 20 to 10 seconds before scheduled time
+                        if task_id not in audio_prefetch_cache:
+                            threading.Thread(target=prefetch_audio, args=(task_data['recordingUrl'], task_id), daemon=True).start()
                     if abs(time_diff) <= 10:  # Exactly at scheduled time (10 second window)
                         # Store current task state if we're switching to an audio task
                         if current_task and not 'recordingUrl' in task_data:
@@ -458,17 +462,16 @@ def fetch_current_task():
                                 'sent_time': task_sent_time,
                                 'due_time': task_due_time
                             }
-                        recording_task = (task_data, scheduled_time, task_doc)
+                        recording_task = (task_data, scheduled_time, task_doc, task_id)
                         break  # Prioritize recording tasks
                     else:
                         continue  # Do not display at all if not exactly time
                 # Otherwise, keep track of the first normal due task (within 5 min)
                 elif not normal_task and time_diff <= 300 and time_diff >= -300:
                     normal_task = (task_data, scheduled_time, task_doc)
-        
         # If a recording task is due, display only that
         if recording_task:
-            task_data, scheduled_time, task_doc = recording_task
+            task_data, scheduled_time, task_doc, task_id = recording_task
             current_task = task_data.get('task', None)
             task_sent_time = task_data.get('sentTime', None)
             task_due_time = task_data.get('dueTime', None)
@@ -478,7 +481,7 @@ def fetch_current_task():
                 task_text += f"\nDue: {due_time.strftime('%H:%M')} on {due_time.strftime('%Y-%m-%d')}"
             task_display.config(text=task_text)
             # Play the recording and handle replay popup
-            play_and_handle_recording(task_data['recordingUrl'], task_doc)
+            play_and_handle_recording(task_data['recordingUrl'], task_doc, task_id)
         elif normal_task:
             task_data, scheduled_time, task_doc = normal_task
             current_task = task_data.get('task', None)
@@ -498,22 +501,43 @@ def fetch_current_task():
         logging.error(f"Error fetching task: {e}")
         messagebox.showerror("Error", f"Failed to fetch task: {e}")
 
-# Helper to play recording and handle replay popup, with delay and retry
+def prefetch_audio(audio_url, task_id):
+    global audio_prefetch_cache
+    try:
+        response = requests.get(audio_url, timeout=15)
+        if response.status_code == 200:
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
+            temp_path = temp_file.name
+            temp_file.close()
+            with open(temp_path, 'wb') as f:
+                f.write(response.content)
+            audio_prefetch_cache[task_id] = temp_path
+            logging.info(f"Prefetched audio for task {task_id}")
+        else:
+            logging.error(f"Prefetch failed: HTTP {response.status_code}")
+    except Exception as e:
+        logging.error(f"Prefetch error for task {task_id}: {e}")
+
+# Helper to play recording and handle replay popup, with prefetch support
 import time as _time
 
-def play_and_handle_recording(audio_url, task_doc):
+def play_and_handle_recording(audio_url, task_doc, task_id):
     def after_playback():
         result = messagebox.askyesno("Replay Recording", "Would you like to hear the recording again?")
         if result:
-            # Replay the recording
-            threading.Thread(target=play_and_handle_recording, args=(audio_url, task_doc), daemon=True).start()
+            threading.Thread(target=play_and_handle_recording, args=(audio_url, task_doc, task_id), daemon=True).start()
         else:
-            # Mark task as completed
             try:
                 task_doc.reference.update({'isCompleted': True, 'completedAt': firestore.SERVER_TIMESTAMP, 'completedBy': 'raspberry_pi'})
             except Exception as e:
                 logging.error(f"Error marking task as completed: {e}")
-            
+            # Clean up cached file
+            if task_id in audio_prefetch_cache:
+                try:
+                    os.remove(audio_prefetch_cache[task_id])
+                except Exception:
+                    pass
+                del audio_prefetch_cache[task_id]
             # Return to previous task state if it exists
             if previous_task_state:
                 global current_task, task_sent_time, task_due_time
@@ -529,36 +553,50 @@ def play_and_handle_recording(audio_url, task_doc):
                 task_display.config(text=task_text)
                 previous_task_state = None
             else:
-                # No previous task, fetch next available task
                 fetch_current_task()
-    
     def play_audio_then_callback():
         max_retries = 3
-        for attempt in range(max_retries):
+        played = False
+        # Try to play from prefetch cache first
+        if task_id in audio_prefetch_cache:
             try:
-                _time.sleep(2)  # Wait before starting playback to ensure fetch
-                response = requests.get(audio_url, timeout=10)
-                if response.status_code == 200:
-                    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
-                    temp_path = temp_file.name
-                    temp_file.close()
-                    with open(temp_path, 'wb') as f:
-                        f.write(response.content)
-                    wav_path = convert_mp3_to_wav(temp_path)
-                    pygame.mixer.music.load(wav_path)
-                    pygame.mixer.music.play()
-                    while pygame.mixer.music.get_busy():
-                        pygame.time.Clock().tick(10)
-                    os.remove(temp_path)
-                    os.remove(wav_path)
-                    break  # Success
-                else:
-                    logging.error(f"Failed to download audio: HTTP {response.status_code}")
+                temp_path = audio_prefetch_cache[task_id]
+                wav_path = convert_mp3_to_wav(temp_path)
+                pygame.mixer.music.load(wav_path)
+                pygame.mixer.music.play()
+                while pygame.mixer.music.get_busy():
+                    pygame.time.Clock().tick(10)
+                os.remove(wav_path)
+                played = True
             except Exception as e:
-                logging.error(f"Error fetching/playing task audio (attempt {attempt+1}): {e}")
-                _time.sleep(2)  # Wait before retry
-        else:
-            messagebox.showerror("Playback Error", "Failed to fetch or play the audio after several attempts.")
+                logging.error(f"Error playing prefetched audio: {e}")
+        if not played:
+            for attempt in range(max_retries):
+                try:
+                    _time.sleep(2)
+                    response = requests.get(audio_url, timeout=10)
+                    if response.status_code == 200:
+                        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
+                        temp_path = temp_file.name
+                        temp_file.close()
+                        with open(temp_path, 'wb') as f:
+                            f.write(response.content)
+                        wav_path = convert_mp3_to_wav(temp_path)
+                        pygame.mixer.music.load(wav_path)
+                        pygame.mixer.music.play()
+                        while pygame.mixer.music.get_busy():
+                            pygame.time.Clock().tick(10)
+                        os.remove(temp_path)
+                        os.remove(wav_path)
+                        played = True
+                        break
+                    else:
+                        logging.error(f"Failed to download audio: HTTP {response.status_code}")
+                except Exception as e:
+                    logging.error(f"Error fetching/playing task audio (attempt {attempt+1}): {e}")
+                    _time.sleep(2)
+            if not played:
+                messagebox.showerror("Playback Error", "Failed to fetch or play the audio after several attempts.")
         after_playback()
     threading.Thread(target=play_audio_then_callback, daemon=True).start()
 
